@@ -2,7 +2,6 @@ package com.marcportabella.immichuploader.domain
 
 import kotlin.jvm.JvmInline
 
-@JvmInline
 value class LocalAssetId(val value: String)
 
 data class LocalAsset(
