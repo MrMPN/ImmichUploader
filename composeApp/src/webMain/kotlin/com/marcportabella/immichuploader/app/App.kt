@@ -6,6 +6,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
+import com.marcportabella.immichuploader.domain.UploadPrepState
 import com.marcportabella.immichuploader.domain.UploadPrepStore
 import com.marcportabella.immichuploader.ui.UploadPrepScreen
 
@@ -38,7 +39,11 @@ fun App() {
     )
 
     MaterialTheme(colorScheme = colorScheme, typography = Typography()) {
-        val store = remember { UploadPrepStore() }
+        val store = remember {
+            UploadPrepStore(
+                UploadPrepState(apiKey = BOOTSTRAP_IMMICH_API_KEY)
+            )
+        }
         UploadPrepScreen(store)
     }
 }

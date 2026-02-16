@@ -1,6 +1,9 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 
+val bootstrapConfigOutputDir = layout.buildDirectory.dir("generated/source/bootstrapConfig/webMain/kotlin")
+val bootstrapApiKey = providers.environmentVariable("IMMICH_API_KEY").orElse("")
+
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.composeMultiplatform)
@@ -15,6 +18,9 @@ kotlin {
     }
 
     sourceSets {
+        matching { it.name == "webMain" }.configureEach {
+            kotlin.srcDir(bootstrapConfigOutputDir)
+        }
         commonMain.dependencies {
             implementation(libs.kotlinx.datetime)
             implementation(libs.compose.runtime)
@@ -31,6 +37,19 @@ kotlin {
         }
     }
 }
+
+val bootstrapConfigFile = bootstrapConfigOutputDir.get()
+    .file("com/marcportabella/immichuploader/app/BootstrapConfig.kt")
+    .asFile
+bootstrapConfigFile.parentFile.mkdirs()
+val escapedApiKey = bootstrapApiKey.get().replace("\\", "\\\\").replace("\"", "\\\"")
+bootstrapConfigFile.writeText(
+    """
+    package com.marcportabella.immichuploader.app
+
+    internal const val BOOTSTRAP_IMMICH_API_KEY: String = "$escapedApiKey"
+    """.trimIndent() + "\n"
+)
 
 // Verification handoffs expect these task names for web checks.
 tasks.register("compileKotlinWeb") {
