@@ -11,6 +11,22 @@ import kotlin.test.assertTrue
 class ComposeAppWebTest {
 
     @Test
+    fun toggleSelectionIgnoresUnknownAssetAndPreservesFeedback() {
+        val known = LocalAssetId("known")
+        val initial = UploadPrepState(
+            assets = mapOf(known to LocalAsset(known, "a.jpg", "image/jpeg", 1, null, null, null)),
+            batchFeedback = BatchFeedback(BatchFeedbackLevel.Warning, "keep")
+        )
+
+        val next = reduceUploadPrepState(
+            initial,
+            UploadPrepAction.ToggleSelection(LocalAssetId("missing"))
+        )
+
+        assertEquals(initial, next)
+    }
+
+    @Test
     fun stageEditForSelectedOnlyAffectsSelectedAssets() {
         val a = LocalAssetId("a")
         val b = LocalAssetId("b")
@@ -53,6 +69,38 @@ class ComposeAppWebTest {
         assertNotNull(merged)
         assertEquals("original", (merged.description as FieldPatch.Set<String?>).value)
         assertEquals(true, (merged.isFavorite as FieldPatch.Set<Boolean>).value)
+    }
+
+    @Test
+    fun replaceAssetsPrunesInvalidSelectionAndStagedEditsAndClearsFeedback() {
+        val keep = LocalAssetId("keep")
+        val drop = LocalAssetId("drop")
+        val initial = UploadPrepState(
+            assets = mapOf(
+                keep to LocalAsset(keep, "keep.jpg", "image/jpeg", 1, null, null, null),
+                drop to LocalAsset(drop, "drop.jpg", "image/jpeg", 1, null, null, null)
+            ),
+            selectedAssetIds = setOf(keep, drop),
+            stagedEditsByAssetId = mapOf(
+                keep to AssetEditPatch(description = FieldPatch.Set("k")),
+                drop to AssetEditPatch(description = FieldPatch.Set("d"))
+            ),
+            batchFeedback = BatchFeedback(BatchFeedbackLevel.Success, "clear")
+        )
+
+        val next = reduceUploadPrepState(
+            initial,
+            UploadPrepAction.ReplaceAssets(
+                listOf(
+                    LocalAsset(keep, "keep-next.jpg", "image/jpeg", 2, null, null, null)
+                )
+            )
+        )
+
+        assertEquals(setOf(keep), next.assets.keys)
+        assertEquals(setOf(keep), next.selectedAssetIds)
+        assertEquals(setOf(keep), next.stagedEditsByAssetId.keys)
+        assertNull(next.batchFeedback)
     }
 
     @Test
@@ -176,6 +224,22 @@ class ComposeAppWebTest {
     }
 
     @Test
+    fun clearStagedForSelectedReportsWarningWhenNothingSelected() {
+        val next = reduceUploadPrepState(
+            UploadPrepState(
+                stagedEditsByAssetId = mapOf(
+                    LocalAssetId("a") to AssetEditPatch(description = FieldPatch.Set("staged"))
+                )
+            ),
+            UploadPrepAction.ClearStagedForSelected
+        )
+
+        assertEquals(BatchFeedbackLevel.Warning, next.batchFeedback?.level)
+        assertEquals("No selected assets to clear.", next.batchFeedback?.message)
+        assertEquals(1, next.stagedEditsByAssetId.size)
+    }
+
+    @Test
     fun dryRunPreflightRequiresSelectionAndValidStagedDateTime() {
         val emptySelection = reduceUploadPrepState(
             UploadPrepState(),
@@ -224,6 +288,50 @@ class ComposeAppWebTest {
     }
 
     @Test
+    fun dryRunGenerationWarnsWhenSelectedIdsDoNotResolveToAssets() {
+        val selectedOnly = LocalAssetId("selected-only")
+        val next = reduceUploadPrepState(
+            UploadPrepState(
+                selectedAssetIds = setOf(selectedOnly),
+                availableAlbums = listOf(ImmichCatalogEntry("a1", "Family")),
+                availableTags = listOf(ImmichCatalogEntry("t1", "Trip"))
+            ),
+            UploadPrepAction.GenerateDryRunPreview
+        )
+
+        assertNotNull(next.dryRunPlan)
+        assertTrue(next.dryRunApiRequests.isEmpty())
+        assertEquals(BatchFeedbackLevel.Warning, next.batchFeedback?.level)
+        assertEquals(
+            "No operations planned. Select assets and/or stage edits first.",
+            next.batchFeedback?.message
+        )
+    }
+
+    @Test
+    fun dryRunPreflightValidatesOnlySelectedAssets() {
+        val selected = LocalAssetId("selected")
+        val unselected = LocalAssetId("unselected")
+        val next = reduceUploadPrepState(
+            UploadPrepState(
+                assets = mapOf(
+                    selected to LocalAsset(selected, "a.jpg", "image/jpeg", 1, null, null, null),
+                    unselected to LocalAsset(unselected, "b.jpg", "image/jpeg", 1, null, null, null)
+                ),
+                selectedAssetIds = setOf(selected),
+                stagedEditsByAssetId = mapOf(
+                    selected to AssetEditPatch(dateTimeOriginal = FieldPatch.Set("2026-01-01T00:00:00Z")),
+                    unselected to AssetEditPatch(dateTimeOriginal = FieldPatch.Set("invalid"))
+                )
+            ),
+            UploadPrepAction.GenerateDryRunPreview
+        )
+
+        assertEquals(BatchFeedbackLevel.Success, next.batchFeedback?.level)
+        assertNotNull(next.dryRunPlan)
+    }
+
+    @Test
     fun bulkMetadataBuilderCreatesRequestWhenPatchContainsMetadataFields() {
         val request = ImmichRequestBuilder.buildBulkMetadataRequest(
             assetIds = setOf("2", "1"),
@@ -268,6 +376,16 @@ class ComposeAppWebTest {
         assertNotNull(tagRequest)
         assertEquals(listOf("a1", "a2"), tagRequest.assetIds)
         assertEquals(listOf("tag-a", "tag-b"), tagRequest.tagIds)
+    }
+
+    @Test
+    fun albumBuilderReturnsNullForBlankAlbumId() {
+        val request = ImmichRequestBuilder.buildAlbumAddRequest(
+            assetIds = setOf("a1"),
+            patch = AssetEditPatch(albumId = FieldPatch.Set("   "))
+        )
+
+        assertNull(request)
     }
 
     @Test
@@ -421,6 +539,30 @@ class ComposeAppWebTest {
     }
 
     @Test
+    fun dryRunPlanGroupsEqualPatchesIntoSingleBulkOperation() {
+        val a = LocalAssetId("a")
+        val b = LocalAssetId("b")
+        val patchA = AssetEditPatch(description = FieldPatch.Set("shared"))
+        val patchB = AssetEditPatch(description = FieldPatch.Set("shared"))
+        val state = UploadPrepState(
+            assets = mapOf(
+                a to LocalAsset(a, "a.jpg", "image/jpeg", 1, null, null, null),
+                b to LocalAsset(b, "b.jpg", "image/jpeg", 2, null, null, null)
+            ),
+            selectedAssetIds = setOf(a, b),
+            stagedEditsByAssetId = mapOf(
+                a to patchA,
+                b to patchB
+            )
+        )
+
+        val plan = ImmichRequestBuilder.buildDryRunPlan(state)
+
+        assertEquals(1, plan.bulkMetadataRequests.size)
+        assertEquals(listOf("remote-a", "remote-b"), plan.bulkMetadataRequests.first().ids)
+    }
+
+    @Test
     fun payloadInspectorBuildsEndpointsAndPayloadsFromPlan() {
         val state = UploadPrepState(
             assets = mapOf(
@@ -453,5 +595,46 @@ class ComposeAppWebTest {
         assertTrue(requests.any { it.method == "PUT" && it.url == "$IMMICH_API_BASE_URL/albums/assets" })
         assertTrue(requests.any { it.body?.contains("\"assetData\":\"<binary:") == true })
         assertTrue(requests.any { it.body?.contains("\"description\":\"caption\"") == true })
+    }
+
+    @Test
+    fun payloadInspectorEscapesJsonForLookupAndPayloadBodies() {
+        val requestPlan = ImmichRequestPlan(
+            uploadRequests = listOf(
+                ImmichUploadRequest(
+                    localAssetId = "a",
+                    deviceAssetId = "dev\"1",
+                    deviceId = "device\\1",
+                    fileCreatedAt = "2026-02-01T00:00:00Z",
+                    fileModifiedAt = "2026-02-01T00:00:00Z",
+                    metadata = mapOf("fileName" to "line\nbreak", "mimeType" to "image/jpeg")
+                )
+            ),
+            bulkMetadataRequests = listOf(
+                ImmichBulkMetadataRequest(
+                    ids = listOf("remote-1"),
+                    description = "quote\"here"
+                )
+            ),
+            lookupHooks = listOf(
+                ImmichLookupHook.CreateAlbumIfMissing("Fam\"ily"),
+                ImmichLookupHook.CreateTagIfMissing("Tri\\p")
+            )
+        )
+
+        val requests = ImmichRequestBuilder.buildPayloadInspectorRequests(requestPlan)
+        val createAlbum = requests.first { it.url == "$IMMICH_API_BASE_URL/albums" }
+        val createTag = requests.first { it.url == "$IMMICH_API_BASE_URL/tags" }
+        val upload = requests.first { it.url == "$IMMICH_API_BASE_URL/assets" }
+        val metadata = requests.first { it.url == "$IMMICH_API_BASE_URL/assets/updateAssets" }
+        val uploadBody = assertNotNull(upload.body)
+        val metadataBody = assertNotNull(metadata.body)
+
+        assertEquals("""{"name":"Fam\"ily"}""", createAlbum.body)
+        assertEquals("""{"name":"Tri\\p"}""", createTag.body)
+        assertTrue(uploadBody.contains("\"deviceAssetId\":\"dev\\\"1\""))
+        assertTrue(uploadBody.contains("\"deviceId\":\"device\\\\1\""))
+        assertTrue(uploadBody.contains("\"fileName\":\"line\\nbreak\""))
+        assertTrue(metadataBody.contains("\"description\":\"quote\\\"here\""))
     }
 }
