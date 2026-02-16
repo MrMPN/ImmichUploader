@@ -704,7 +704,7 @@ private fun SingleSelectionEditorCard(
             )
             Text(asset.fileName, fontWeight = FontWeight.Medium)
             Text("${asset.mimeType} - ${asset.fileSizeBytes} bytes")
-            Text("Timezone (read-only source): ${asset.timeZone ?: "Unknown"}")
+            metadata.captureDisplay?.let { Text("Capture: $it") }
             Text("Camera: ${metadata.cameraLabel ?: "Unknown"}")
             if (metadata.exifSummary != null) {
                 Text("EXIF: ${metadata.exifSummary}")

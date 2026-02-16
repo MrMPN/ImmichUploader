@@ -32,6 +32,8 @@ import com.marcportabella.immichuploader.domain.FieldPatch
 import com.marcportabella.immichuploader.domain.LocalAsset
 import com.marcportabella.immichuploader.domain.LocalAssetId
 import com.marcportabella.immichuploader.domain.UploadPrepState
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.UtcOffset
 import org.jetbrains.skia.Image
 
 fun LazyListScope.assetQueueSection(
@@ -142,15 +144,8 @@ private fun AssetQueueTile(
             }
 
             Text(
-                text = metadata.dateTimeOriginal ?: "Unknown date",
+                text = metadata.captureDisplay ?: "Capture date not available",
                 style = MaterialTheme.typography.bodySmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = metadata.timeZone ?: "Unknown timezone",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -220,6 +215,7 @@ private fun PreviewDisabledPlaceholder(
 data class DisplayMetadata(
     val dateTimeOriginal: String?,
     val timeZone: String?,
+    val captureDisplay: String?,
     val cameraLabel: String?,
     val description: String?,
     val isFavorite: Boolean?,
@@ -241,6 +237,7 @@ fun LocalAsset.toDisplayMetadata(patch: AssetEditPatch?): DisplayMetadata {
     return DisplayMetadata(
         dateTimeOriginal = dateTimeOriginal,
         timeZone = timeZone,
+        captureDisplay = formatCaptureDateTime(dateTimeOriginal, timeZone),
         cameraLabel = listOfNotNull(cameraMake, cameraModel).joinToString(" ").ifBlank { null },
         description = description,
         isFavorite = isFavorite,
@@ -248,4 +245,20 @@ fun LocalAsset.toDisplayMetadata(patch: AssetEditPatch?): DisplayMetadata {
         tagIds = (tagIds + addTags) - removeTags,
         exifSummary = exifSummary
     )
+}
+
+fun formatCaptureDateTime(
+    dateTimeOriginal: String?,
+    timeZone: String?
+): String? {
+    val dateTime = dateTimeOriginal?.trim().orEmpty()
+    if (dateTime.isBlank()) return null
+
+    val normalizedDateTime = runCatching { LocalDateTime.parse(dateTime).toString() }.getOrElse { dateTime }
+    val normalizedOffset = timeZone
+        ?.trim()
+        ?.takeIf { it.isNotBlank() }
+        ?.let { runCatching { UtcOffset.parse(it).toString() }.getOrElse { it } }
+
+    return if (normalizedOffset == null) normalizedDateTime else "$normalizedDateTime $normalizedOffset"
 }
