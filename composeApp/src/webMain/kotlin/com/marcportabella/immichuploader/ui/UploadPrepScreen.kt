@@ -60,20 +60,22 @@ fun UploadPrepScreen(store: UploadPrepStore) {
             val listener: (Event) -> Unit = {
                 val fileList = input.files
                 if (fileList != null) {
-                    val nextFiles = mutableListOf<com.marcportabella.immichuploader.domain.LocalIntakeFile>()
-                    for (index in 0 until fileList.length) {
-                        val file = fileList.item(index) ?: continue
-                        nextFiles += file.toLocalIntakeFile()
-                    }
+                    scope.launch {
+                        val nextFiles = mutableListOf<com.marcportabella.immichuploader.domain.LocalIntakeFile>()
+                        for (index in 0 until fileList.length) {
+                            val file = fileList.item(index) ?: continue
+                            nextFiles += file.toLocalIntakeFile()
+                        }
 
-                    store.state.assets.values.mapNotNull { it.previewUrl }.forEach {
-                        revokeObjectUrl(it)
-                    }
+                        store.state.assets.values.mapNotNull { it.previewUrl }.forEach {
+                            revokeObjectUrl(it)
+                        }
 
-                    val assets = mapLocalIntakeFilesToAssets(nextFiles)
-                    store.dispatch(UploadPrepAction.ReplaceAssets(assets))
-                    store.dispatch(UploadPrepAction.ClearSelection)
-                    input.value = ""
+                        val assets = mapLocalIntakeFilesToAssets(nextFiles)
+                        store.dispatch(UploadPrepAction.ReplaceAssets(assets))
+                        store.dispatch(UploadPrepAction.ClearSelection)
+                        input.value = ""
+                    }
                 }
             }
 

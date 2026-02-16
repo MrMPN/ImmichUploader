@@ -1,7 +1,5 @@
 package com.marcportabella.immichuploader.domain
 
-import kotlin.jvm.JvmInline
-
 value class LocalAssetId(val value: String)
 
 data class LocalAsset(
@@ -15,7 +13,11 @@ data class LocalAsset(
     val description: String? = null,
     val isFavorite: Boolean? = null,
     val albumId: String? = null,
-    val tagIds: Set<String> = emptySet()
+    val tagIds: Set<String> = emptySet(),
+    val previewBytes: ByteArray? = null,
+    val cameraMake: String? = null,
+    val cameraModel: String? = null,
+    val exifMetadata: Map<String, String> = emptyMap()
 )
 
 sealed interface FieldPatch<out T> {
