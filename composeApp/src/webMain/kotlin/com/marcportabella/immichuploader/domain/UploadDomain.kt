@@ -1,4 +1,4 @@
-package com.marcportabella.immichuploader
+package com.marcportabella.immichuploader.domain
 
 import kotlin.jvm.JvmInline
 

@@ -1,4 +1,4 @@
-package com.marcportabella.immichuploader
+package com.marcportabella.immichuploader.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -9,6 +9,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.marcportabella.immichuploader.domain.AssetEditPatch
+import com.marcportabella.immichuploader.domain.FieldPatch
+import com.marcportabella.immichuploader.domain.LocalAsset
+import com.marcportabella.immichuploader.domain.LocalAssetId
+import com.marcportabella.immichuploader.domain.UploadPrepState
 
 @Composable
 fun AssetQueueSection(

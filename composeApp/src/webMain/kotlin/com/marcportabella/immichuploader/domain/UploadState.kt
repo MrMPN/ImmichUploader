@@ -1,8 +1,12 @@
-package com.marcportabella.immichuploader
+package com.marcportabella.immichuploader.domain
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.marcportabella.immichuploader.data.ImmichApiRequest
+import com.marcportabella.immichuploader.data.ImmichCatalogEntry
+import com.marcportabella.immichuploader.data.ImmichRequestBuilder
+import com.marcportabella.immichuploader.data.ImmichRequestPlan
 
 data class BulkEditDraft(
     val includeDescription: Boolean = false,

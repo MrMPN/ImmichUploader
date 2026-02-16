@@ -1,4 +1,9 @@
-package com.marcportabella.immichuploader
+package com.marcportabella.immichuploader.data
+
+import com.marcportabella.immichuploader.domain.AssetEditPatch
+import com.marcportabella.immichuploader.domain.FieldPatch
+import com.marcportabella.immichuploader.domain.LocalAsset
+import com.marcportabella.immichuploader.domain.UploadPrepState
 
 const val IMMICH_API_BASE_URL: String = "https://fotos.marcportabella.com/api"
 

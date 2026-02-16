@@ -1,4 +1,4 @@
-package com.marcportabella.immichuploader
+package com.marcportabella.immichuploader.app
 
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.window.ComposeViewport

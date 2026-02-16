@@ -1,5 +1,6 @@
-package com.marcportabella.immichuploader
+package com.marcportabella.immichuploader.web
 
+import com.marcportabella.immichuploader.domain.LocalIntakeFile
 import org.w3c.files.File
 
 fun File.toLocalIntakeFile(): LocalIntakeFile {

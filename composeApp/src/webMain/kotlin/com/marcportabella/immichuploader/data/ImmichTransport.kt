@@ -1,4 +1,4 @@
-package com.marcportabella.immichuploader
+package com.marcportabella.immichuploader.data
 
 import kotlinx.coroutines.await
 import kotlin.js.JsAny

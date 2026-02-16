@@ -1,4 +1,4 @@
-package com.marcportabella.immichuploader
+package com.marcportabella.immichuploader.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -11,6 +11,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.marcportabella.immichuploader.domain.BatchFeedback
+import com.marcportabella.immichuploader.domain.BatchFeedbackLevel
 
 @Composable
 fun BatchFeedbackBanner(

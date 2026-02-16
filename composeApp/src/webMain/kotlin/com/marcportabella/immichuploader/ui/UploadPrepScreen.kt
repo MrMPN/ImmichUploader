@@ -1,4 +1,4 @@
-package com.marcportabella.immichuploader
+package com.marcportabella.immichuploader.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -19,6 +19,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.marcportabella.immichuploader.data.ApiImmichOnlineTransport
+import com.marcportabella.immichuploader.data.ApiKeyGatedImmichCatalogTransport
+import com.marcportabella.immichuploader.data.ApiKeyGatedImmichTransport
+import com.marcportabella.immichuploader.data.DryRunImmichCatalogTransport
+import com.marcportabella.immichuploader.data.ImmichCatalogResult
+import com.marcportabella.immichuploader.data.ImmichTransportResult
+import com.marcportabella.immichuploader.domain.LocalAssetId
+import com.marcportabella.immichuploader.domain.UploadExecutionStatus
+import com.marcportabella.immichuploader.domain.UploadPrepAction
+import com.marcportabella.immichuploader.domain.UploadPrepStore
+import com.marcportabella.immichuploader.domain.canApplyBulkEdit
+import com.marcportabella.immichuploader.domain.mapLocalIntakeFilesToAssets
+import com.marcportabella.immichuploader.domain.preflightBulkEditDraft
+import com.marcportabella.immichuploader.web.revokeObjectUrl
+import com.marcportabella.immichuploader.web.toLocalIntakeFile
 import kotlinx.browser.document
 import kotlinx.coroutines.launch
 import org.w3c.dom.HTMLInputElement
@@ -37,7 +52,7 @@ fun UploadPrepScreen(store: UploadPrepStore) {
             val listener: (Event) -> Unit = {
                 val fileList = input.files
                 if (fileList != null) {
-                    val nextFiles = mutableListOf<LocalIntakeFile>()
+                    val nextFiles = mutableListOf<com.marcportabella.immichuploader.domain.LocalIntakeFile>()
                     for (index in 0 until fileList.length) {
                         val file = fileList.item(index) ?: continue
                         nextFiles += file.toLocalIntakeFile()
