@@ -8,11 +8,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
@@ -20,6 +17,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.toComposeImageBitmap
@@ -41,6 +39,7 @@ fun AssetQueueSection(
     val sortedAssets = remember(state.assets) {
         state.assets.values.sortedBy { it.fileName }
     }
+    val thumbnailCache = remember { mutableMapOf<LocalAssetId, ImageBitmap?>() }
 
     Card(
         modifier = Modifier
@@ -62,59 +61,52 @@ fun AssetQueueSection(
                 Text("No files selected yet.")
             } else {
                 Text("Sorted by filename for predictable review.")
-
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 620.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(sortedAssets, key = { it.id.value }) { asset ->
-                        val patch = state.stagedEditsByAssetId[asset.id]
-                        val metadata = asset.toDisplayMetadata(patch)
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant
-                            )
+                sortedAssets.forEach { asset ->
+                    val patch = state.stagedEditsByAssetId[asset.id]
+                    val metadata = asset.toDisplayMetadata(patch)
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(10.dp),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            Checkbox(
+                                checked = asset.id in state.selectedAssetIds,
+                                onCheckedChange = { onToggleSelection(asset.id) }
+                            )
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(2.dp)
                             ) {
-                                Checkbox(
-                                    checked = asset.id in state.selectedAssetIds,
-                                    onCheckedChange = { onToggleSelection(asset.id) }
-                                )
-                                Column(
+                                Row(
                                     modifier = Modifier.fillMaxWidth(),
-                                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
-                                    Row(
+                                    AssetPreviewThumbnail(
+                                        asset = asset,
+                                        thumbnailCache = thumbnailCache
+                                    )
+                                    Column(
                                         modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                        verticalArrangement = Arrangement.spacedBy(2.dp)
                                     ) {
-                                        AssetPreviewThumbnail(asset)
-                                        Column(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .heightIn(min = 92.dp),
-                                            verticalArrangement = Arrangement.spacedBy(2.dp)
-                                        ) {
-                                            Text(asset.fileName, fontWeight = FontWeight.Medium)
-                                            Text("${asset.mimeType} · ${asset.fileSizeBytes} bytes")
-                                            Text("Date/time: ${metadata.dateTimeOriginal ?: "Unknown"}")
-                                            Text("Timezone: ${metadata.timeZone ?: "Unknown"} (read-only)")
-                                            Text("Camera: ${metadata.cameraLabel ?: "Unknown"}")
-                                            Text("Description: ${metadata.description ?: "None"}")
-                                            Text("Favorite: ${metadata.isFavorite?.toString() ?: "None"}")
-                                            Text("Album: ${metadata.albumId ?: "None"}")
-                                            Text("Tags: ${if (metadata.tagIds.isEmpty()) "None" else metadata.tagIds.joinToString(", ")}")
-                                            if (metadata.exifSummary != null) {
-                                                Text("EXIF: ${metadata.exifSummary}")
-                                            }
+                                        Text(asset.fileName, fontWeight = FontWeight.Medium)
+                                        Text("${asset.mimeType} · ${asset.fileSizeBytes} bytes")
+                                        Text("Date/time: ${metadata.dateTimeOriginal ?: "Unknown"}")
+                                        Text("Timezone: ${metadata.timeZone ?: "Unknown"} (read-only)")
+                                        Text("Camera: ${metadata.cameraLabel ?: "Unknown"}")
+                                        Text("Description: ${metadata.description ?: "None"}")
+                                        Text("Favorite: ${metadata.isFavorite?.toString() ?: "None"}")
+                                        Text("Album: ${metadata.albumId ?: "None"}")
+                                        Text("Tags: ${if (metadata.tagIds.isEmpty()) "None" else metadata.tagIds.joinToString(", ")}")
+                                        if (metadata.exifSummary != null) {
+                                            Text("EXIF: ${metadata.exifSummary}")
                                         }
                                     }
                                 }
@@ -128,9 +120,12 @@ fun AssetQueueSection(
 }
 
 @Composable
-private fun AssetPreviewThumbnail(asset: LocalAsset) {
-    val imageBitmap = remember(asset.id, asset.previewBytes) {
-        val bytes = asset.previewBytes ?: return@remember null
+private fun AssetPreviewThumbnail(
+    asset: LocalAsset,
+    thumbnailCache: MutableMap<LocalAssetId, ImageBitmap?>
+) {
+    val imageBitmap = thumbnailCache.getOrPut(asset.id) {
+        val bytes = asset.previewBytes ?: return@getOrPut null
         runCatching { Image.makeFromEncoded(bytes).toComposeImageBitmap() }.getOrNull()
     }
 
@@ -193,9 +188,6 @@ fun LocalAsset.toDisplayMetadata(patch: AssetEditPatch?): DisplayMetadata {
         isFavorite = isFavorite,
         albumId = albumId,
         tagIds = (tagIds + addTags) - removeTags,
-        exifSummary = exifMetadata
-            .takeIf { it.isNotEmpty() }
-            ?.entries
-            ?.joinToString(" · ") { "${it.key}=${it.value}" }
+        exifSummary = exifSummary
     )
 }

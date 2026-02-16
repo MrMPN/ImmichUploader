@@ -17,7 +17,8 @@ data class LocalAsset(
     val previewBytes: ByteArray? = null,
     val cameraMake: String? = null,
     val cameraModel: String? = null,
-    val exifMetadata: Map<String, String> = emptyMap()
+    val exifMetadata: Map<String, String> = emptyMap(),
+    val exifSummary: String? = null
 )
 
 sealed interface FieldPatch<out T> {

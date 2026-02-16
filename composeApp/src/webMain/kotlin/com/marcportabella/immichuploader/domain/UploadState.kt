@@ -482,7 +482,8 @@ data class LocalIntakeFile(
     val timeZone: String? = null,
     val cameraMake: String? = null,
     val cameraModel: String? = null,
-    val exifMetadata: Map<String, String> = emptyMap()
+    val exifMetadata: Map<String, String> = emptyMap(),
+    val exifSummary: String? = null
 )
 
 data class ParsedExifMetadata(
@@ -509,7 +510,8 @@ fun mapLocalIntakeFilesToAssets(files: List<LocalIntakeFile>): List<LocalAsset> 
             previewBytes = file.previewBytes,
             cameraMake = file.cameraMake,
             cameraModel = file.cameraModel,
-            exifMetadata = file.exifMetadata
+            exifMetadata = file.exifMetadata,
+            exifSummary = file.exifSummary
         )
     }
 

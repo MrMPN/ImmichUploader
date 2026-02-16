@@ -33,7 +33,12 @@ suspend fun File.toLocalIntakeFile(): LocalIntakeFile {
         timeZone = exifMetadata?.timeZone,
         cameraMake = exifMetadata?.cameraMake,
         cameraModel = exifMetadata?.cameraModel,
-        exifMetadata = exifMetadata?.metadata ?: emptyMap()
+        exifMetadata = exifMetadata?.metadata ?: emptyMap(),
+        exifSummary = exifMetadata
+            ?.metadata
+            ?.takeIf { it.isNotEmpty() }
+            ?.entries
+            ?.joinToString(" · ") { "${it.key}=${it.value}" }
     )
 }
 
