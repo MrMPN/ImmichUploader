@@ -3,11 +3,13 @@ package com.marcportabella.immichuploader.ui
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -34,9 +36,14 @@ import com.marcportabella.immichuploader.data.ApiKeyGatedImmichTransport
 import com.marcportabella.immichuploader.data.DryRunImmichCatalogTransport
 import com.marcportabella.immichuploader.data.ImmichCatalogResult
 import com.marcportabella.immichuploader.data.ImmichTransportResult
+import com.marcportabella.immichuploader.domain.AssetEditPatch
+import com.marcportabella.immichuploader.domain.BulkEditDraft
+import com.marcportabella.immichuploader.domain.FieldPatch
+import com.marcportabella.immichuploader.domain.LocalAsset
 import com.marcportabella.immichuploader.domain.LocalAssetId
 import com.marcportabella.immichuploader.domain.UploadExecutionStatus
 import com.marcportabella.immichuploader.domain.UploadPrepAction
+import com.marcportabella.immichuploader.domain.UploadPrepState
 import com.marcportabella.immichuploader.domain.UploadPrepStore
 import com.marcportabella.immichuploader.domain.canApplyBulkEdit
 import com.marcportabella.immichuploader.domain.mapLocalIntakeFilesToAssets
@@ -98,51 +105,513 @@ fun UploadPrepScreen(store: UploadPrepStore) {
     val catalogGateStatus = catalogTransport.gateStatus(state.apiKey.ifBlank { null })
     val bulkPreflightFeedback = preflightBulkEditDraft(state)
     val sortedAssets = remember(state.assets) { state.assets.values.sortedBy { it.fileName } }
+    val selectedAssets = remember(state.selectedAssetIds, state.assets) {
+        state.selectedAssetIds.mapNotNull { state.assets[it] }.sortedBy { it.fileName }
+    }
     val thumbnailCache = remember { mutableMapOf<LocalAssetId, ImageBitmap?>() }
 
-    LazyColumn(
+    val openFilePicker: () -> Unit = {
+        val input = document.getElementById("local-file-input") as? HTMLInputElement
+        input?.click()
+        Unit
+    }
+
+    val runExecution: () -> Unit = runExecution@{
+        val plan = state.dryRunPlan ?: return@runExecution
+        scope.launch {
+            store.dispatch(
+                UploadPrepAction.UploadExecutionStarted(
+                    "Executing ${state.dryRunApiRequests.size} API requests."
+                )
+            )
+            when (val result = transport.submit(plan = plan, apiKey = state.apiKey.ifBlank { null })) {
+                is ImmichTransportResult.BlockedMissingApiKey ->
+                    store.dispatch(
+                        UploadPrepAction.UploadExecutionBlocked(
+                            "API key required. Upload execution remained blocked."
+                        )
+                    )
+
+                is ImmichTransportResult.DryRun ->
+                    store.dispatch(
+                        UploadPrepAction.UploadExecutionFailed(
+                            "Execution stayed in dry-run mode. Configure executable transport first."
+                        )
+                    )
+
+                is ImmichTransportResult.Submitted ->
+                    store.dispatch(
+                        UploadPrepAction.UploadExecutionSubmitted(
+                            requestCount = result.requestCount,
+                            message = "Submitted ${result.requestCount} API requests."
+                        )
+                    )
+
+                is ImmichTransportResult.Failed ->
+                    store.dispatch(
+                        UploadPrepAction.UploadExecutionFailed(result.message)
+                    )
+            }
+        }
+        Unit
+    }
+
+    BoxWithConstraints(
         modifier = Modifier
             .background(MaterialTheme.colorScheme.background)
             .safeContentPadding()
-            .fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .fillMaxSize()
     ) {
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+        val isNarrow = maxWidth < 1100.dp
+
+        if (isNarrow) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Text(
-                        text = "Immich Upload Prep",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.SemiBold
+                item {
+                    SummaryHeaderCard(
+                        assetCount = state.assets.size,
+                        selectedCount = state.selectedAssetIds.size,
+                        stagedCount = state.stagedEditsByAssetId.size,
+                        gateStatus = gateStatus.toString(),
+                        executionPath = executionPath.toString(),
+                        catalogGateStatus = catalogGateStatus.toString()
                     )
-                    Text(
-                        text = "Prepare metadata, validate the dry-run payload, then execute upload safely.",
-                        style = MaterialTheme.typography.bodyMedium
+                }
+                item {
+                    ConnectionCard(
+                        apiKey = state.apiKey,
+                        onApiKeyChange = { store.dispatch(UploadPrepAction.SetApiKey(it)) }
                     )
-                    FlowRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        SummaryPill("Assets", state.assets.size.toString())
-                        SummaryPill("Selected", state.selectedAssetIds.size.toString())
-                        SummaryPill("Staged", state.stagedEditsByAssetId.size.toString())
-                        SummaryPill("Transport", gateStatus.toString())
-                        SummaryPill("Execution", executionPath.toString())
-                        SummaryPill("Catalog", catalogGateStatus.toString())
+                }
+                item {
+                    QueueSelectionCard(
+                        state = state,
+                        onOpenFilePicker = openFilePicker,
+                        onSelectAll = { store.dispatch(UploadPrepAction.SelectAll) },
+                        onClearSelection = { store.dispatch(UploadPrepAction.ClearSelection) }
+                    )
+                }
+
+                assetQueueSection(
+                    state = state,
+                    sortedAssets = sortedAssets,
+                    thumbnailCache = thumbnailCache,
+                    onToggleSelection = { store.dispatch(UploadPrepAction.ToggleSelection(it)) }
+                )
+
+                item {
+                    SelectionSidebarPane(
+                        state = state,
+                        selectedAssets = selectedAssets,
+                        preflightMessage = bulkPreflightFeedback?.message,
+                        onSingleAssetPatch = { assetId, patch ->
+                            store.dispatch(UploadPrepAction.StageEditForAsset(assetId, patch))
+                        },
+                        onClearSingleSelectionStaged = { store.dispatch(UploadPrepAction.ClearStagedForSelected) },
+                        onBulkDraftChange = { store.dispatch(UploadPrepAction.SetBulkEditDraft(it)) },
+                        onApplyBulk = { store.dispatch(UploadPrepAction.ApplyBulkEditDraftToSelected) },
+                        onClearBulkDraft = { store.dispatch(UploadPrepAction.ClearBulkEditDraft) },
+                        onClearSelectedStaged = { store.dispatch(UploadPrepAction.ClearStagedForSelected) }
+                    )
+                }
+
+                if (state.batchFeedback != null) {
+                    item {
+                        BatchFeedbackBanner(
+                            feedback = state.batchFeedback,
+                            onDismiss = { store.dispatch(UploadPrepAction.ClearBatchFeedback) }
+                        )
                     }
+                }
+
+                item {
+                    CatalogSection(
+                        state = state,
+                        onLookupAlbums = {
+                            scope.launch {
+                                store.dispatch(UploadPrepAction.CatalogRequestStarted)
+                                when (val result = catalogTransport.lookupAlbums(state.apiKey.ifBlank { null })) {
+                                    is ImmichCatalogResult.BlockedMissingApiKey ->
+                                        store.dispatch(UploadPrepAction.CatalogBlockedMissingApiKey(result.message))
+
+                                    is ImmichCatalogResult.DryRunSuccess ->
+                                        store.dispatch(UploadPrepAction.CatalogAlbumsLoaded(result.entries, result.message))
+                                }
+                            }
+                        },
+                        onLookupTags = {
+                            scope.launch {
+                                store.dispatch(UploadPrepAction.CatalogRequestStarted)
+                                when (val result = catalogTransport.lookupTags(state.apiKey.ifBlank { null })) {
+                                    is ImmichCatalogResult.BlockedMissingApiKey ->
+                                        store.dispatch(UploadPrepAction.CatalogBlockedMissingApiKey(result.message))
+
+                                    is ImmichCatalogResult.DryRunSuccess ->
+                                        store.dispatch(UploadPrepAction.CatalogTagsLoaded(result.entries, result.message))
+                                }
+                            }
+                        },
+                        onAlbumDraftChange = { store.dispatch(UploadPrepAction.SetAlbumCreateDraft(it)) },
+                        onTagDraftChange = { store.dispatch(UploadPrepAction.SetTagCreateDraft(it)) },
+                        onCreateAlbum = {
+                            scope.launch {
+                                store.dispatch(UploadPrepAction.CatalogRequestStarted)
+                                when (
+                                    val result = catalogTransport.createAlbumIfMissing(
+                                        state.apiKey.ifBlank { null },
+                                        state.albumCreateDraft
+                                    )
+                                ) {
+                                    is ImmichCatalogResult.BlockedMissingApiKey ->
+                                        store.dispatch(UploadPrepAction.CatalogBlockedMissingApiKey(result.message))
+
+                                    is ImmichCatalogResult.DryRunSuccess -> {
+                                        store.dispatch(UploadPrepAction.CatalogAlbumsLoaded(result.entries, result.message))
+                                        store.dispatch(UploadPrepAction.SetAlbumCreateDraft(""))
+                                    }
+                                }
+                            }
+                        },
+                        onCreateTag = {
+                            scope.launch {
+                                store.dispatch(UploadPrepAction.CatalogRequestStarted)
+                                when (
+                                    val result = catalogTransport.createTagIfMissing(
+                                        state.apiKey.ifBlank { null },
+                                        state.tagCreateDraft
+                                    )
+                                ) {
+                                    is ImmichCatalogResult.BlockedMissingApiKey ->
+                                        store.dispatch(UploadPrepAction.CatalogBlockedMissingApiKey(result.message))
+
+                                    is ImmichCatalogResult.DryRunSuccess -> {
+                                        store.dispatch(UploadPrepAction.CatalogTagsLoaded(result.entries, result.message))
+                                        store.dispatch(UploadPrepAction.SetTagCreateDraft(""))
+                                    }
+                                }
+                            }
+                        },
+                        onClearMessage = { store.dispatch(UploadPrepAction.ClearCatalogMessage) }
+                    )
+                }
+
+                item {
+                    DryRunExecutionCard(
+                        state = state,
+                        onGenerateDryRun = { store.dispatch(UploadPrepAction.GenerateDryRunPreview) },
+                        onClearDryRun = { store.dispatch(UploadPrepAction.ClearDryRunPreview) },
+                        onExecute = runExecution,
+                        onClearExecutionStatus = { store.dispatch(UploadPrepAction.ClearUploadExecutionStatus) }
+                    )
+                }
+
+                item { DryRunInspectorSection(state) }
+            }
+        } else {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp, vertical = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                LazyColumn(
+                    modifier = Modifier
+                        .weight(1.6f)
+                        .fillMaxHeight(),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    item {
+                        SummaryHeaderCard(
+                            assetCount = state.assets.size,
+                            selectedCount = state.selectedAssetIds.size,
+                            stagedCount = state.stagedEditsByAssetId.size,
+                            gateStatus = gateStatus.toString(),
+                            executionPath = executionPath.toString(),
+                            catalogGateStatus = catalogGateStatus.toString()
+                        )
+                    }
+                    item {
+                        QueueSelectionCard(
+                            state = state,
+                            onOpenFilePicker = openFilePicker,
+                            onSelectAll = { store.dispatch(UploadPrepAction.SelectAll) },
+                            onClearSelection = { store.dispatch(UploadPrepAction.ClearSelection) }
+                        )
+                    }
+                    assetQueueSection(
+                        state = state,
+                        sortedAssets = sortedAssets,
+                        thumbnailCache = thumbnailCache,
+                        onToggleSelection = { store.dispatch(UploadPrepAction.ToggleSelection(it)) }
+                    )
+                }
+
+                LazyColumn(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    item {
+                        ConnectionCard(
+                            apiKey = state.apiKey,
+                            onApiKeyChange = { store.dispatch(UploadPrepAction.SetApiKey(it)) }
+                        )
+                    }
+                    item {
+                        SelectionSidebarPane(
+                            state = state,
+                            selectedAssets = selectedAssets,
+                            preflightMessage = bulkPreflightFeedback?.message,
+                            onSingleAssetPatch = { assetId, patch ->
+                                store.dispatch(UploadPrepAction.StageEditForAsset(assetId, patch))
+                            },
+                            onClearSingleSelectionStaged = { store.dispatch(UploadPrepAction.ClearStagedForSelected) },
+                            onBulkDraftChange = { store.dispatch(UploadPrepAction.SetBulkEditDraft(it)) },
+                            onApplyBulk = { store.dispatch(UploadPrepAction.ApplyBulkEditDraftToSelected) },
+                            onClearBulkDraft = { store.dispatch(UploadPrepAction.ClearBulkEditDraft) },
+                            onClearSelectedStaged = { store.dispatch(UploadPrepAction.ClearStagedForSelected) }
+                        )
+                    }
+                    if (state.batchFeedback != null) {
+                        item {
+                            BatchFeedbackBanner(
+                                feedback = state.batchFeedback,
+                                onDismiss = { store.dispatch(UploadPrepAction.ClearBatchFeedback) }
+                            )
+                        }
+                    }
+                    item {
+                        CatalogSection(
+                            state = state,
+                            onLookupAlbums = {
+                                scope.launch {
+                                    store.dispatch(UploadPrepAction.CatalogRequestStarted)
+                                    when (val result = catalogTransport.lookupAlbums(state.apiKey.ifBlank { null })) {
+                                        is ImmichCatalogResult.BlockedMissingApiKey ->
+                                            store.dispatch(UploadPrepAction.CatalogBlockedMissingApiKey(result.message))
+
+                                        is ImmichCatalogResult.DryRunSuccess ->
+                                            store.dispatch(
+                                                UploadPrepAction.CatalogAlbumsLoaded(result.entries, result.message)
+                                            )
+                                    }
+                                }
+                            },
+                            onLookupTags = {
+                                scope.launch {
+                                    store.dispatch(UploadPrepAction.CatalogRequestStarted)
+                                    when (val result = catalogTransport.lookupTags(state.apiKey.ifBlank { null })) {
+                                        is ImmichCatalogResult.BlockedMissingApiKey ->
+                                            store.dispatch(UploadPrepAction.CatalogBlockedMissingApiKey(result.message))
+
+                                        is ImmichCatalogResult.DryRunSuccess ->
+                                            store.dispatch(UploadPrepAction.CatalogTagsLoaded(result.entries, result.message))
+                                    }
+                                }
+                            },
+                            onAlbumDraftChange = { store.dispatch(UploadPrepAction.SetAlbumCreateDraft(it)) },
+                            onTagDraftChange = { store.dispatch(UploadPrepAction.SetTagCreateDraft(it)) },
+                            onCreateAlbum = {
+                                scope.launch {
+                                    store.dispatch(UploadPrepAction.CatalogRequestStarted)
+                                    when (
+                                        val result = catalogTransport.createAlbumIfMissing(
+                                            state.apiKey.ifBlank { null },
+                                            state.albumCreateDraft
+                                        )
+                                    ) {
+                                        is ImmichCatalogResult.BlockedMissingApiKey ->
+                                            store.dispatch(UploadPrepAction.CatalogBlockedMissingApiKey(result.message))
+
+                                        is ImmichCatalogResult.DryRunSuccess -> {
+                                            store.dispatch(
+                                                UploadPrepAction.CatalogAlbumsLoaded(result.entries, result.message)
+                                            )
+                                            store.dispatch(UploadPrepAction.SetAlbumCreateDraft(""))
+                                        }
+                                    }
+                                }
+                            },
+                            onCreateTag = {
+                                scope.launch {
+                                    store.dispatch(UploadPrepAction.CatalogRequestStarted)
+                                    when (
+                                        val result = catalogTransport.createTagIfMissing(
+                                            state.apiKey.ifBlank { null },
+                                            state.tagCreateDraft
+                                        )
+                                    ) {
+                                        is ImmichCatalogResult.BlockedMissingApiKey ->
+                                            store.dispatch(UploadPrepAction.CatalogBlockedMissingApiKey(result.message))
+
+                                        is ImmichCatalogResult.DryRunSuccess -> {
+                                            store.dispatch(UploadPrepAction.CatalogTagsLoaded(result.entries, result.message))
+                                            store.dispatch(UploadPrepAction.SetTagCreateDraft(""))
+                                        }
+                                    }
+                                }
+                            },
+                            onClearMessage = { store.dispatch(UploadPrepAction.ClearCatalogMessage) }
+                        )
+                    }
+                    item {
+                        DryRunExecutionCard(
+                            state = state,
+                            onGenerateDryRun = { store.dispatch(UploadPrepAction.GenerateDryRunPreview) },
+                            onClearDryRun = { store.dispatch(UploadPrepAction.ClearDryRunPreview) },
+                            onExecute = runExecution,
+                            onClearExecutionStatus = { store.dispatch(UploadPrepAction.ClearUploadExecutionStatus) }
+                        )
+                    }
+                    item { DryRunInspectorSection(state) }
                 }
             }
         }
+    }
+}
 
-        item {
+@Composable
+private fun SummaryHeaderCard(
+    assetCount: Int,
+    selectedCount: Int,
+    stagedCount: Int,
+    gateStatus: String,
+    executionPath: String,
+    catalogGateStatus: String
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "Immich Upload Prep",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                text = "Prepare metadata, validate the dry-run payload, then execute upload safely.",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                SummaryPill("Assets", assetCount.toString())
+                SummaryPill("Selected", selectedCount.toString())
+                SummaryPill("Staged", stagedCount.toString())
+                SummaryPill("Transport", gateStatus)
+                SummaryPill("Execution", executionPath)
+                SummaryPill("Catalog", catalogGateStatus)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ConnectionCard(
+    apiKey: String,
+    onApiKeyChange: (String) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                "Connection",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                "API key is required for catalog lookups, catalog create operations, and upload execution.",
+                style = MaterialTheme.typography.bodySmall
+            )
+            OutlinedTextField(
+                value = apiKey,
+                onValueChange = onApiKeyChange,
+                label = { Text("Immich API key") },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun QueueSelectionCard(
+    state: UploadPrepState,
+    onOpenFilePicker: () -> Unit,
+    onSelectAll: () -> Unit,
+    onClearSelection: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                "Queue selection",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                "Load local media, review in the explorer pane, then use the sidebar for edit details.",
+                style = MaterialTheme.typography.bodySmall
+            )
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(onClick = onOpenFilePicker) {
+                    Text("Select local media")
+                }
+                Button(
+                    onClick = onSelectAll,
+                    enabled = state.assets.isNotEmpty()
+                ) {
+                    Text("Select all")
+                }
+                Button(
+                    onClick = onClearSelection,
+                    enabled = state.selectedAssetIds.isNotEmpty()
+                ) {
+                    Text("Clear selection")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SelectionSidebarPane(
+    state: UploadPrepState,
+    selectedAssets: List<LocalAsset>,
+    preflightMessage: String?,
+    onSingleAssetPatch: (LocalAssetId, AssetEditPatch) -> Unit,
+    onClearSingleSelectionStaged: () -> Unit,
+    onBulkDraftChange: (BulkEditDraft) -> Unit,
+    onApplyBulk: () -> Unit,
+    onClearBulkDraft: () -> Unit,
+    onClearSelectedStaged: () -> Unit
+) {
+    when (selectedAssets.size) {
+        0 -> {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -152,273 +621,230 @@ fun UploadPrepScreen(store: UploadPrepStore) {
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        "Connection",
+                        "Details sidebar",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold
                     )
-                    Text(
-                        "API key is required for catalog lookups, catalog create operations, and upload execution.",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                    OutlinedTextField(
-                        value = state.apiKey,
-                        onValueChange = { store.dispatch(UploadPrepAction.SetApiKey(it)) },
-                        label = { Text("Immich API key") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    Text("No files selected.")
+                    Text("Select one asset to inspect and edit metadata, or select multiple for bulk editing.")
                 }
             }
         }
 
-        item {
-            CatalogSection(
-                state = state,
-                onLookupAlbums = {
-                    scope.launch {
-                        store.dispatch(UploadPrepAction.CatalogRequestStarted)
-                        when (val result = catalogTransport.lookupAlbums(state.apiKey.ifBlank { null })) {
-                            is ImmichCatalogResult.BlockedMissingApiKey ->
-                                store.dispatch(UploadPrepAction.CatalogBlockedMissingApiKey(result.message))
-
-                            is ImmichCatalogResult.DryRunSuccess ->
-                                store.dispatch(UploadPrepAction.CatalogAlbumsLoaded(result.entries, result.message))
-                        }
-                    }
-                },
-                onLookupTags = {
-                    scope.launch {
-                        store.dispatch(UploadPrepAction.CatalogRequestStarted)
-                        when (val result = catalogTransport.lookupTags(state.apiKey.ifBlank { null })) {
-                            is ImmichCatalogResult.BlockedMissingApiKey ->
-                                store.dispatch(UploadPrepAction.CatalogBlockedMissingApiKey(result.message))
-
-                            is ImmichCatalogResult.DryRunSuccess ->
-                                store.dispatch(UploadPrepAction.CatalogTagsLoaded(result.entries, result.message))
-                        }
-                    }
-                },
-                onAlbumDraftChange = { store.dispatch(UploadPrepAction.SetAlbumCreateDraft(it)) },
-                onTagDraftChange = { store.dispatch(UploadPrepAction.SetTagCreateDraft(it)) },
-                onCreateAlbum = {
-                    scope.launch {
-                        store.dispatch(UploadPrepAction.CatalogRequestStarted)
-                        when (
-                            val result = catalogTransport.createAlbumIfMissing(
-                                state.apiKey.ifBlank { null },
-                                state.albumCreateDraft
-                            )
-                        ) {
-                            is ImmichCatalogResult.BlockedMissingApiKey ->
-                                store.dispatch(UploadPrepAction.CatalogBlockedMissingApiKey(result.message))
-
-                            is ImmichCatalogResult.DryRunSuccess -> {
-                                store.dispatch(UploadPrepAction.CatalogAlbumsLoaded(result.entries, result.message))
-                                store.dispatch(UploadPrepAction.SetAlbumCreateDraft(""))
-                            }
-                        }
-                    }
-                },
-                onCreateTag = {
-                    scope.launch {
-                        store.dispatch(UploadPrepAction.CatalogRequestStarted)
-                        when (
-                            val result = catalogTransport.createTagIfMissing(
-                                state.apiKey.ifBlank { null },
-                                state.tagCreateDraft
-                            )
-                        ) {
-                            is ImmichCatalogResult.BlockedMissingApiKey ->
-                                store.dispatch(UploadPrepAction.CatalogBlockedMissingApiKey(result.message))
-
-                            is ImmichCatalogResult.DryRunSuccess -> {
-                                store.dispatch(UploadPrepAction.CatalogTagsLoaded(result.entries, result.message))
-                                store.dispatch(UploadPrepAction.SetTagCreateDraft(""))
-                            }
-                        }
-                    }
-                },
-                onClearMessage = { store.dispatch(UploadPrepAction.ClearCatalogMessage) }
+        1 -> {
+            val asset = selectedAssets.first()
+            val patch = state.stagedEditsByAssetId[asset.id]
+            SingleSelectionEditorCard(
+                asset = asset,
+                patch = patch,
+                onPatch = { onSingleAssetPatch(asset.id, it) },
+                onClearStaged = onClearSingleSelectionStaged
             )
         }
 
-        item {
+        else -> {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        "Queue selection",
+                        "Bulk edit mode",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold
                     )
-                    Text(
-                        "Load local media first, then select assets for bulk actions and dry-run generation.",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                    FlowRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Button(
-                            onClick = {
-                                val input = document.getElementById("local-file-input") as? HTMLInputElement
-                                input?.click()
-                            }
-                        ) {
-                            Text("Select local media")
-                        }
-                        Button(
-                            onClick = { store.dispatch(UploadPrepAction.SelectAll) },
-                            enabled = state.assets.isNotEmpty()
-                        ) {
-                            Text("Select all")
-                        }
-                        Button(
-                            onClick = { store.dispatch(UploadPrepAction.ClearSelection) },
-                            enabled = state.selectedAssetIds.isNotEmpty()
-                        ) {
-                            Text("Clear selection")
-                        }
-                    }
+                    Text("${selectedAssets.size} assets selected. Changes from this panel apply to the whole selection.")
                 }
             }
-        }
 
-        item {
             BulkEditSection(
                 draft = state.bulkEditDraft,
                 selectedCount = state.selectedAssetIds.size,
                 applyEnabled = canApplyBulkEdit(state),
-                preflightMessage = bulkPreflightFeedback?.message,
-                onDraftChange = { store.dispatch(UploadPrepAction.SetBulkEditDraft(it)) },
-                onApply = { store.dispatch(UploadPrepAction.ApplyBulkEditDraftToSelected) },
-                onClearDraft = { store.dispatch(UploadPrepAction.ClearBulkEditDraft) },
-                onClearSelectedStaged = { store.dispatch(UploadPrepAction.ClearStagedForSelected) }
+                preflightMessage = preflightMessage,
+                onDraftChange = onBulkDraftChange,
+                onApply = onApplyBulk,
+                onClearDraft = onClearBulkDraft,
+                onClearSelectedStaged = onClearSelectedStaged
             )
         }
+    }
+}
 
-        if (state.batchFeedback != null) {
-            item {
-                BatchFeedbackBanner(
-                    feedback = state.batchFeedback,
-                    onDismiss = { store.dispatch(UploadPrepAction.ClearBatchFeedback) }
-                )
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SingleSelectionEditorCard(
+    asset: LocalAsset,
+    patch: AssetEditPatch?,
+    onPatch: (AssetEditPatch) -> Unit,
+    onClearStaged: () -> Unit
+) {
+    val metadata = asset.toDisplayMetadata(patch)
+    val favorite = metadata.isFavorite ?: false
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                "Asset details",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(asset.fileName, fontWeight = FontWeight.Medium)
+            Text("${asset.mimeType} - ${asset.fileSizeBytes} bytes")
+            Text("Timezone (read-only source): ${asset.timeZone ?: "Unknown"}")
+            Text("Camera: ${metadata.cameraLabel ?: "Unknown"}")
+            if (metadata.exifSummary != null) {
+                Text("EXIF: ${metadata.exifSummary}")
             }
-        }
 
-        item {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .animateContentSize(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            HorizontalDivider()
+            Text("Edit metadata to stage single-asset changes.")
+
+            OutlinedTextField(
+                value = metadata.description.orEmpty(),
+                onValueChange = {
+                    onPatch(
+                        AssetEditPatch(description = FieldPatch.Set(it.ifBlank { null }))
+                    )
+                },
+                label = { Text("Description") },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            OutlinedTextField(
+                value = metadata.dateTimeOriginal.orEmpty(),
+                onValueChange = {
+                    onPatch(
+                        AssetEditPatch(dateTimeOriginal = FieldPatch.Set(it))
+                    )
+                },
+                label = { Text("Date/time original (ISO 8601)") },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            OutlinedTextField(
+                value = metadata.timeZone.orEmpty(),
+                onValueChange = {
+                    onPatch(
+                        AssetEditPatch(timeZone = FieldPatch.Set(it))
+                    )
+                },
+                label = { Text("Timezone (e.g. +02:00 or Z)") },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            OutlinedTextField(
+                value = metadata.albumId.orEmpty(),
+                onValueChange = {
+                    onPatch(
+                        AssetEditPatch(albumId = FieldPatch.Set(it.ifBlank { null }))
+                    )
+                },
+                label = { Text("Album ID") },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                Button(
+                    onClick = {
+                        onPatch(
+                            AssetEditPatch(isFavorite = FieldPatch.Set(!favorite))
+                        )
+                    }
                 ) {
-                    Text(
-                        "Dry-run and execution",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        "Generate a preview before execution to verify payload details and request count.",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                    FlowRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Button(
-                            onClick = { store.dispatch(UploadPrepAction.GenerateDryRunPreview) },
-                            enabled = state.selectedAssetIds.isNotEmpty()
-                        ) {
-                            Text("Generate dry-run plan")
-                        }
-                        Button(
-                            onClick = { store.dispatch(UploadPrepAction.ClearDryRunPreview) },
-                            enabled = state.dryRunPlan != null
-                        ) {
-                            Text("Clear dry-run")
-                        }
-                        Button(
-                            onClick = {
-                                val plan = state.dryRunPlan ?: return@Button
-                                scope.launch {
-                                    store.dispatch(
-                                        UploadPrepAction.UploadExecutionStarted(
-                                            "Executing ${state.dryRunApiRequests.size} API requests."
-                                        )
-                                    )
-                                    when (val result = transport.submit(plan = plan, apiKey = state.apiKey.ifBlank { null })) {
-                                        is ImmichTransportResult.BlockedMissingApiKey ->
-                                            store.dispatch(
-                                                UploadPrepAction.UploadExecutionBlocked(
-                                                    "API key required. Upload execution remained blocked."
-                                                )
-                                            )
-
-                                        is ImmichTransportResult.DryRun ->
-                                            store.dispatch(
-                                                UploadPrepAction.UploadExecutionFailed(
-                                                    "Execution stayed in dry-run mode. Configure executable transport first."
-                                                )
-                                            )
-
-                                        is ImmichTransportResult.Submitted ->
-                                            store.dispatch(
-                                                UploadPrepAction.UploadExecutionSubmitted(
-                                                    requestCount = result.requestCount,
-                                                    message = "Submitted ${result.requestCount} API requests."
-                                                )
-                                            )
-
-                                        is ImmichTransportResult.Failed ->
-                                            store.dispatch(
-                                                UploadPrepAction.UploadExecutionFailed(result.message)
-                                            )
-                                    }
-                                }
-                            },
-                            enabled = state.dryRunPlan != null && state.executionStatus != UploadExecutionStatus.Executing
-                        ) {
-                            Text("Execute API upload")
-                        }
-                        Button(
-                            onClick = { store.dispatch(UploadPrepAction.ClearUploadExecutionStatus) },
-                            enabled = state.executionMessage != null || state.executionStatus != UploadExecutionStatus.Idle
-                        ) {
-                            Text("Clear execution status")
-                        }
-                    }
-
-                    HorizontalDivider()
-                    Text("Execution status: ${state.executionStatus}")
-                    if (state.executionMessage != null) {
-                        Text("Execution message: ${state.executionMessage}")
-                    }
-                    if (state.executionRequestCount != null) {
-                        Text("Submitted requests: ${state.executionRequestCount}")
-                    }
+                    Text("Favorite = ${!favorite}")
+                }
+                Button(onClick = onClearStaged) {
+                    Text("Clear staged for selected")
                 }
             }
         }
+    }
+}
 
-        item { DryRunInspectorSection(state) }
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun DryRunExecutionCard(
+    state: UploadPrepState,
+    onGenerateDryRun: () -> Unit,
+    onClearDryRun: () -> Unit,
+    onExecute: () -> Unit,
+    onClearExecutionStatus: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                "Dry-run and execution",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                "Generate a preview before execution to verify payload details and request count.",
+                style = MaterialTheme.typography.bodySmall
+            )
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    onClick = onGenerateDryRun,
+                    enabled = state.selectedAssetIds.isNotEmpty()
+                ) {
+                    Text("Generate dry-run plan")
+                }
+                Button(
+                    onClick = onClearDryRun,
+                    enabled = state.dryRunPlan != null
+                ) {
+                    Text("Clear dry-run")
+                }
+                Button(
+                    onClick = onExecute,
+                    enabled = state.dryRunPlan != null && state.executionStatus != UploadExecutionStatus.Executing
+                ) {
+                    Text("Execute API upload")
+                }
+                Button(
+                    onClick = onClearExecutionStatus,
+                    enabled = state.executionMessage != null || state.executionStatus != UploadExecutionStatus.Idle
+                ) {
+                    Text("Clear execution status")
+                }
+            }
 
-        assetQueueSection(
-            state = state,
-            sortedAssets = sortedAssets,
-            thumbnailCache = thumbnailCache,
-            onToggleSelection = { store.dispatch(UploadPrepAction.ToggleSelection(it)) }
-        )
+            HorizontalDivider()
+            Text("Execution status: ${state.executionStatus}")
+            if (state.executionMessage != null) {
+                Text("Execution message: ${state.executionMessage}")
+            }
+            if (state.executionRequestCount != null) {
+                Text("Submitted requests: ${state.executionRequestCount}")
+            }
+        }
     }
 }
 
