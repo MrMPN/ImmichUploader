@@ -35,6 +35,22 @@ suspend fun File.toLocalIntakeFile(): LocalIntakeFile {
         null
     }
 
+    if (type.startsWith("image/")) {
+        if (exifMetadata == null) {
+            console.warn(
+                "[immichuploader][exif] file=\"$name\" type=\"$type\" -> no EXIF metadata parsed"
+            )
+        } else {
+            console.log(
+                "[immichuploader][exif] file=\"$name\" type=\"$type\" " +
+                    "captureDateTime=\"${exifMetadata.captureDateTime}\" " +
+                    "timeZone=\"${exifMetadata.timeZone}\" " +
+                    "camera=\"${listOfNotNull(exifMetadata.cameraMake, exifMetadata.cameraModel).joinToString(" ").ifBlank { "unknown" }}\" " +
+                    "keys=${exifMetadata.metadata.keys.sorted().joinToString(",")}"
+            )
+        }
+    }
+
     return LocalIntakeFile(
         name = name,
         type = type,
@@ -159,3 +175,8 @@ private external object URL {
 }
 
 private external fun atob(value: String): String
+
+private external object console {
+    fun log(message: String)
+    fun warn(message: String)
+}
