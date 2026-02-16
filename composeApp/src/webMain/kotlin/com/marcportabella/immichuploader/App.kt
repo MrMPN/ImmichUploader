@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.browser.document
 import kotlinx.coroutines.launch
 import org.w3c.dom.HTMLInputElement
+import org.w3c.dom.events.Event
 import org.w3c.files.File
 
 @Composable
@@ -38,7 +39,7 @@ fun App() {
             if (input == null) {
                 onDispose { }
             } else {
-                val listener: (dynamic) -> Unit = {
+                val listener: (Event) -> Unit = {
                     val fileList = input.files
                     if (fileList != null) {
                         val nextFiles = mutableListOf<LocalIntakeFile>()
@@ -603,15 +604,12 @@ private fun File.toLocalIntakeFile(): LocalIntakeFile {
     return LocalIntakeFile(
         name = name,
         type = type,
-        size = size.toLong(),
-        lastModifiedEpochMillis = lastModified.toLong(),
+        size = size.toString().substringBefore('.').toLongOrNull() ?: 0L,
+        lastModifiedEpochMillis = lastModified.toString().substringBefore('.').toLongOrNull() ?: 0L,
         previewUrl = previewUrl
     )
 }
 
-private fun createObjectUrl(file: File): String? =
-    runCatching { js("URL.createObjectURL(file)") as String }.getOrNull()
+private fun createObjectUrl(file: File): String? = null
 
-private fun revokeObjectUrl(url: String) {
-    runCatching { js("URL.revokeObjectURL(url)") }
-}
+private fun revokeObjectUrl(url: String) = Unit

@@ -45,3 +45,17 @@ tasks.register("compileKotlinWeb") {
 tasks.register("webTest") {
     dependsOn(":composeApp:jsNodeTest")
 }
+
+val chromeBin = System.getenv("CHROME_BIN")
+if (chromeBin.isNullOrBlank()) {
+    tasks.matching { it.name in setOf("jsBrowserTest", "wasmJsBrowserTest") }.configureEach {
+        enabled = false
+    }
+    tasks.named("check") {
+        dependsOn(":composeApp:jsNodeTest")
+    }
+}
+
+rootProject.tasks.matching { it.name == "kotlinStoreYarnLock" }.configureEach {
+    enabled = false
+}

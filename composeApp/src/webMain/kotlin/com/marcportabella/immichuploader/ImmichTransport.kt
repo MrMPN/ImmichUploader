@@ -1,8 +1,5 @@
 package com.marcportabella.immichuploader
 
-import kotlinx.browser.window
-import kotlinx.coroutines.await
-
 enum class UploadExecutionPath {
     BlockedMissingApiKey,
     ApiExecution
@@ -79,25 +76,8 @@ data class ImmichApiExecutorResult(
 )
 
 class BrowserImmichApiExecutor : ImmichApiExecutor {
-    override suspend fun execute(request: ImmichApiRequest, apiKey: String): ImmichApiExecutorResult {
-        val init = js("({})")
-        init.method = request.method
-
-        val headers = js("({})")
-        headers["x-api-key"] = apiKey
-        if (request.body != null) {
-            headers["Content-Type"] = "application/json"
-            init.body = request.body
-        }
-        init.headers = headers
-
-        val response = window.fetch(request.url, init).await()
-        val body = response.text().await()
-        return ImmichApiExecutorResult(
-            statusCode = response.status.toInt(),
-            responseBody = body
-        )
-    }
+    override suspend fun execute(request: ImmichApiRequest, apiKey: String): ImmichApiExecutorResult =
+        error("Browser API execution is not available on this target.")
 }
 
 class ApiImmichOnlineTransport(
