@@ -1,22 +1,17 @@
 package com.marcportabella.immichuploader.data
 
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromString
 
 class ApiImmichOnlineCatalogTransport(
     private val executor: ImmichApiExecutor = BrowserImmichApiExecutor()
 ) : ImmichOnlineCatalogTransport {
-    private val json = Json { ignoreUnknownKeys = true }
-
     override suspend fun lookupAlbums(apiKey: String): ImmichCatalogResult.Success {
         val request = ImmichCatalogRequestBuilder.lookupAlbums()
         val execution = execute(request, apiKey)
         val result = execution.result
         val entries = if (result != null && result.statusCode in 200..299) {
-            parseEntries(result.responseBody, nameKeys = listOf("albumName", "name"))
+            parseAlbumEntries(result.responseBody)
         } else {
             emptyList()
         }
@@ -35,7 +30,7 @@ class ApiImmichOnlineCatalogTransport(
         val execution = execute(request, apiKey)
         val result = execution.result
         val entries = if (result != null && result.statusCode in 200..299) {
-            parseEntries(result.responseBody, nameKeys = listOf("value", "name"))
+            parseTagEntries(result.responseBody)
         } else {
             emptyList()
         }
@@ -101,20 +96,42 @@ class ApiImmichOnlineCatalogTransport(
                 }
             )
 
-    private fun parseEntries(responseBody: String, nameKeys: List<String>): List<ImmichCatalogEntry> {
-        val root = runCatching { json.parseToJsonElement(responseBody) }.getOrNull() ?: return emptyList()
-        val array = root as? JsonArray ?: return emptyList()
-        return array.mapNotNull { element ->
-            val obj = element as? JsonObject ?: return@mapNotNull null
-            val id = obj["id"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
-            val name = nameKeys.firstNotNullOfOrNull { key -> obj[key]?.jsonPrimitive?.contentOrNull }
-                ?: return@mapNotNull null
-            ImmichCatalogEntry(id = id, name = name)
-        }.distinctBy { it.id }.sortedBy { it.name.lowercase() }
-    }
+    private fun parseAlbumEntries(responseBody: String): List<ImmichCatalogEntry> =
+        runCatching { immichJson.decodeFromString<List<ImmichAlbumResponse>>(responseBody) }
+            .getOrDefault(emptyList())
+            .mapNotNull { album ->
+                val name = album.albumName ?: album.name ?: return@mapNotNull null
+                ImmichCatalogEntry(id = album.id, name = name)
+            }
+            .distinctBy { it.id }
+            .sortedBy { it.name.lowercase() }
+
+    private fun parseTagEntries(responseBody: String): List<ImmichCatalogEntry> =
+        runCatching { immichJson.decodeFromString<List<ImmichTagResponse>>(responseBody) }
+            .getOrDefault(emptyList())
+            .mapNotNull { tag ->
+                val name = tag.value ?: tag.name ?: return@mapNotNull null
+                ImmichCatalogEntry(id = tag.id, name = name)
+            }
+            .distinctBy { it.id }
+            .sortedBy { it.name.lowercase() }
 }
 
 private data class ExecutionAttempt(
     val result: ImmichApiExecutorResult?,
     val errorMessage: String?
+)
+
+@Serializable
+private data class ImmichAlbumResponse(
+    val id: String,
+    val albumName: String? = null,
+    val name: String? = null
+)
+
+@Serializable
+private data class ImmichTagResponse(
+    val id: String,
+    val name: String? = null,
+    val value: String? = null
 )

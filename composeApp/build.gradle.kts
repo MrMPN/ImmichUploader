@@ -20,6 +20,7 @@ val bootstrapApiKey = providers.gradleProperty("immichApiKey")
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
+    alias(libs.plugins.kotlinSerialization)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
 }

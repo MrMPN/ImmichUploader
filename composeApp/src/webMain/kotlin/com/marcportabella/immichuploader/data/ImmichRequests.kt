@@ -4,8 +4,16 @@ import com.marcportabella.immichuploader.domain.AssetEditPatch
 import com.marcportabella.immichuploader.domain.FieldPatch
 import com.marcportabella.immichuploader.domain.LocalAsset
 import com.marcportabella.immichuploader.domain.UploadPrepState
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 const val IMMICH_API_BASE_URL: String = "https://fotos.marcportabella.com/api"
+internal val immichJson: Json = Json {
+    encodeDefaults = false
+    explicitNulls = false
+    ignoreUnknownKeys = true
+}
 
 data class ImmichUploadRequest(
     val localAssetId: String,
@@ -16,6 +24,7 @@ data class ImmichUploadRequest(
     val metadata: Map<String, String>
 )
 
+@Serializable
 data class ImmichBulkMetadataRequest(
     val ids: List<String>,
     val dateTimeOriginal: String? = null,
@@ -24,18 +33,22 @@ data class ImmichBulkMetadataRequest(
     val isFavorite: Boolean? = null
 )
 
+@Serializable
 data class ImmichTagAssignRequest(
     val assetIds: List<String>,
     val tagIds: List<String>
 )
 
+@Serializable
 data class ImmichAlbumAddRequest(
     val albumId: String,
     val assetIds: List<String>
 )
 
+@Serializable
 data class ImmichAlbumCreateRequest(val name: String)
 
+@Serializable
 data class ImmichTagCreateRequest(val name: String)
 
 data class ImmichApiRequest(
@@ -61,14 +74,14 @@ object ImmichCatalogRequestBuilder {
         ImmichApiRequest(
             method = "POST",
             url = "$IMMICH_API_BASE_URL/albums",
-            body = """{"name":"${name.trim().escapeJson()}"}"""
+            body = immichJson.encodeToString(ImmichAlbumCreateRequest(name.trim()))
         )
 
     fun createTag(name: String): ImmichApiRequest =
         ImmichApiRequest(
             method = "POST",
             url = "$IMMICH_API_BASE_URL/tags",
-            body = """{"name":"${name.trim().escapeJson()}"}"""
+            body = immichJson.encodeToString(ImmichTagCreateRequest(name.trim()))
         )
 }
 
@@ -78,20 +91,6 @@ sealed interface ImmichLookupHook {
     data class CreateAlbumIfMissing(val name: String) : ImmichLookupHook
     data class CreateTagIfMissing(val name: String) : ImmichLookupHook
 }
-
-private fun String.escapeJson(): String =
-    buildString(length) {
-        for (char in this@escapeJson) {
-            when (char) {
-                '\\' -> append("\\\\")
-                '"' -> append("\\\"")
-                '\n' -> append("\\n")
-                '\r' -> append("\\r")
-                '\t' -> append("\\t")
-                else -> append(char)
-            }
-        }
-    }
 
 data class ImmichRequestPlan(
     val uploadRequests: List<ImmichUploadRequest> = emptyList(),
@@ -271,24 +270,34 @@ object ImmichRequestBuilder {
 }
 
 private fun ImmichUploadRequest.toPayloadJson(): String {
-    val metadataJson = metadata.entries
-        .sortedBy { it.key }
-        .joinToString(",") { (key, value) -> """"${key.escapeJson()}":"${value.escapeJson()}"""" }
-    return """{"assetData":"<binary:$localAssetId>","deviceAssetId":"${deviceAssetId.escapeJson()}","deviceId":"${deviceId.escapeJson()}","fileCreatedAt":"${fileCreatedAt.escapeJson()}","fileModifiedAt":"${fileModifiedAt.escapeJson()}","metadata":{$metadataJson}}"""
+    val payload = ImmichUploadPayload(
+        assetData = "<binary:$localAssetId>",
+        deviceAssetId = deviceAssetId,
+        deviceId = deviceId,
+        fileCreatedAt = fileCreatedAt,
+        fileModifiedAt = fileModifiedAt,
+        metadata = metadata
+    )
+    return immichJson.encodeToString(payload)
 }
 
 private fun ImmichBulkMetadataRequest.toPayloadJson(): String {
-    val fields = mutableListOf<String>()
-    fields += """"ids":[${ids.sorted().joinToString(",") { """"${it.escapeJson()}"""" }}]"""
-    dateTimeOriginal?.let { fields += """"dateTimeOriginal":"${it.escapeJson()}"""" }
-    timeZone?.let { fields += """"timeZone":"${it.escapeJson()}"""" }
-    description?.let { fields += """"description":"${it.escapeJson()}"""" }
-    isFavorite?.let { fields += """"isFavorite":$it""" }
-    return "{${fields.joinToString(",")}}"
+    val payload = copy(ids = ids.sorted())
+    return immichJson.encodeToString(payload)
 }
 
 private fun ImmichTagAssignRequest.toPayloadJson(): String =
-    """{"assetIds":[${assetIds.sorted().joinToString(",") { """"${it.escapeJson()}"""" }}],"tagIds":[${tagIds.sorted().joinToString(",") { """"${it.escapeJson()}"""" }}]}"""
+    immichJson.encodeToString(copy(assetIds = assetIds.sorted(), tagIds = tagIds.sorted()))
 
 private fun ImmichAlbumAddRequest.toPayloadJson(): String =
-    """{"albumId":"${albumId.escapeJson()}","assetIds":[${assetIds.sorted().joinToString(",") { """"${it.escapeJson()}"""" }}]}"""
+    immichJson.encodeToString(copy(assetIds = assetIds.sorted()))
+
+@Serializable
+private data class ImmichUploadPayload(
+    val assetData: String,
+    val deviceAssetId: String,
+    val deviceId: String,
+    val fileCreatedAt: String,
+    val fileModifiedAt: String,
+    val metadata: Map<String, String>
+)
