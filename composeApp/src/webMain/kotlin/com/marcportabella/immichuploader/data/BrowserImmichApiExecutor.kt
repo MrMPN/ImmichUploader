@@ -15,14 +15,11 @@ class BrowserImmichApiExecutor : ImmichApiExecutor {
             }
         }
 
-        val init = RequestInit(
+        val init = createRequestInit(
             method = request.method,
-            headers = headers
-        ).apply {
-            if (request.body != null) {
-                body = request.body
-            }
-        }
+            headers = headers,
+            body = request.body
+        )
 
         val response = fetch(
             input = request.url,
@@ -41,11 +38,9 @@ private external class Headers {
     fun append(name: String, value: String)
 }
 
-private external class RequestInit(
-    method: String? = definedExternally,
-    headers: Headers? = definedExternally,
-    body: String? = definedExternally
-) {
+private external interface RequestInit : JsAny {
+    var method: String?
+    var headers: Headers?
     var body: String?
 }
 
@@ -58,3 +53,19 @@ private external interface FetchResponse : JsAny {
 
 @OptIn(ExperimentalWasmJsInterop::class)
 private external fun fetch(input: String, init: RequestInit): Promise<JsAny?>
+
+@OptIn(ExperimentalWasmJsInterop::class)
+private fun createRequestInit(
+    method: String,
+    headers: Headers,
+    body: String?
+): RequestInit {
+    val init = jsEmptyObject().unsafeCast<RequestInit>()
+    init.method = method
+    init.headers = headers
+    init.body = body
+    return init
+}
+
+@OptIn(ExperimentalWasmJsInterop::class)
+private fun jsEmptyObject(): JsAny = js("{}")
