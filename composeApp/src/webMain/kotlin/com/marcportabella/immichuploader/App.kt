@@ -610,6 +610,14 @@ private fun File.toLocalIntakeFile(): LocalIntakeFile {
     )
 }
 
-private fun createObjectUrl(file: File): String? = null
+private fun createObjectUrl(file: File): String? =
+    runCatching { URL.createObjectURL(file) }.getOrNull()
 
-private fun revokeObjectUrl(url: String) = Unit
+private fun revokeObjectUrl(url: String) {
+    runCatching { URL.revokeObjectURL(url) }
+}
+
+private external object URL {
+    fun createObjectURL(file: File): String
+    fun revokeObjectURL(url: String)
+}
