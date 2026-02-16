@@ -18,9 +18,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.browser.document
+import kotlinx.coroutines.launch
 import org.w3c.dom.HTMLInputElement
 import org.w3c.files.File
 
@@ -29,6 +31,7 @@ fun App() {
     MaterialTheme {
         val store = remember { UploadPrepStore() }
         val state = store.state
+        val scope = rememberCoroutineScope()
 
         DisposableEffect(store) {
             val input = document.getElementById("local-file-input") as? HTMLInputElement
@@ -80,6 +83,8 @@ fun App() {
 
         val transport = remember { ApiKeyGatedImmichTransport(DryRunImmichTransport()) }
         val gateStatus = transport.gateStatus(apiKey = null)
+        val catalogTransport = remember { ApiKeyGatedImmichCatalogTransport(DryRunImmichCatalogTransport()) }
+        val catalogGateStatus = catalogTransport.gateStatus(state.apiKey.ifBlank { null })
 
         Column(
             modifier = Modifier
@@ -96,6 +101,73 @@ fun App() {
             Text("Staged edits: ${state.stagedEditsByAssetId.size}")
             Text("Bulk metadata request ready: ${stagedBulkRequest != null}")
             Text("Transport gate: $gateStatus")
+            Text("Catalog gate: $catalogGateStatus")
+
+            OutlinedTextField(
+                value = state.apiKey,
+                onValueChange = { store.dispatch(UploadPrepAction.SetApiKey(it)) },
+                label = { Text("Immich API key (required for lookup/create)") },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            CatalogSection(
+                state = state,
+                onLookupAlbums = {
+                    scope.launch {
+                        store.dispatch(UploadPrepAction.CatalogRequestStarted)
+                        when (val result = catalogTransport.lookupAlbums(state.apiKey.ifBlank { null })) {
+                            is ImmichCatalogResult.BlockedMissingApiKey ->
+                                store.dispatch(UploadPrepAction.CatalogBlockedMissingApiKey(result.message))
+
+                            is ImmichCatalogResult.DryRunSuccess ->
+                                store.dispatch(UploadPrepAction.CatalogAlbumsLoaded(result.entries, result.message))
+                        }
+                    }
+                },
+                onLookupTags = {
+                    scope.launch {
+                        store.dispatch(UploadPrepAction.CatalogRequestStarted)
+                        when (val result = catalogTransport.lookupTags(state.apiKey.ifBlank { null })) {
+                            is ImmichCatalogResult.BlockedMissingApiKey ->
+                                store.dispatch(UploadPrepAction.CatalogBlockedMissingApiKey(result.message))
+
+                            is ImmichCatalogResult.DryRunSuccess ->
+                                store.dispatch(UploadPrepAction.CatalogTagsLoaded(result.entries, result.message))
+                        }
+                    }
+                },
+                onAlbumDraftChange = { store.dispatch(UploadPrepAction.SetAlbumCreateDraft(it)) },
+                onTagDraftChange = { store.dispatch(UploadPrepAction.SetTagCreateDraft(it)) },
+                onCreateAlbum = {
+                    scope.launch {
+                        store.dispatch(UploadPrepAction.CatalogRequestStarted)
+                        when (val result = catalogTransport.createAlbumIfMissing(state.apiKey.ifBlank { null }, state.albumCreateDraft)) {
+                            is ImmichCatalogResult.BlockedMissingApiKey ->
+                                store.dispatch(UploadPrepAction.CatalogBlockedMissingApiKey(result.message))
+
+                            is ImmichCatalogResult.DryRunSuccess -> {
+                                store.dispatch(UploadPrepAction.CatalogAlbumsLoaded(result.entries, result.message))
+                                store.dispatch(UploadPrepAction.SetAlbumCreateDraft(""))
+                            }
+                        }
+                    }
+                },
+                onCreateTag = {
+                    scope.launch {
+                        store.dispatch(UploadPrepAction.CatalogRequestStarted)
+                        when (val result = catalogTransport.createTagIfMissing(state.apiKey.ifBlank { null }, state.tagCreateDraft)) {
+                            is ImmichCatalogResult.BlockedMissingApiKey ->
+                                store.dispatch(UploadPrepAction.CatalogBlockedMissingApiKey(result.message))
+
+                            is ImmichCatalogResult.DryRunSuccess -> {
+                                store.dispatch(UploadPrepAction.CatalogTagsLoaded(result.entries, result.message))
+                                store.dispatch(UploadPrepAction.SetTagCreateDraft(""))
+                            }
+                        }
+                    }
+                },
+                onClearMessage = { store.dispatch(UploadPrepAction.ClearCatalogMessage) }
+            )
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
@@ -162,6 +234,84 @@ fun App() {
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CatalogSection(
+    state: UploadPrepState,
+    onLookupAlbums: () -> Unit,
+    onLookupTags: () -> Unit,
+    onAlbumDraftChange: (String) -> Unit,
+    onTagDraftChange: (String) -> Unit,
+    onCreateAlbum: () -> Unit,
+    onCreateTag: () -> Unit,
+    onClearMessage: () -> Unit
+) {
+    Text("Immich tags/albums")
+    Text("Catalog status: ${state.catalogStatus}")
+
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button(onClick = onLookupAlbums) {
+            Text("Load albums")
+        }
+        Button(onClick = onLookupTags) {
+            Text("Load tags")
+        }
+    }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        OutlinedTextField(
+            value = state.albumCreateDraft,
+            onValueChange = onAlbumDraftChange,
+            label = { Text("Create album if missing") },
+            modifier = Modifier.fillMaxWidth()
+        )
+        Button(onClick = onCreateAlbum) {
+            Text("Create album")
+        }
+    }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        OutlinedTextField(
+            value = state.tagCreateDraft,
+            onValueChange = onTagDraftChange,
+            label = { Text("Create tag if missing") },
+            modifier = Modifier.fillMaxWidth()
+        )
+        Button(onClick = onCreateTag) {
+            Text("Create tag")
+        }
+    }
+
+    Text("Albums loaded: ${state.availableAlbums.size}")
+    Text("Tags loaded: ${state.availableTags.size}")
+    Text(
+        "Album names: ${
+            if (state.availableAlbums.isEmpty()) "None"
+            else state.availableAlbums.joinToString(", ") { it.name }
+        }"
+    )
+    Text(
+        "Tag names: ${
+            if (state.availableTags.isEmpty()) "None"
+            else state.availableTags.joinToString(", ") { it.name }
+        }"
+    )
+
+    if (state.catalogMessage != null) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(state.catalogMessage)
+            Button(onClick = onClearMessage) {
+                Text("Dismiss")
             }
         }
     }

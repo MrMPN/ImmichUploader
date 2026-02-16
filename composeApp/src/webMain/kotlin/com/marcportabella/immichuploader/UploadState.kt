@@ -21,8 +21,22 @@ data class UploadPrepState(
     val assets: Map<LocalAssetId, LocalAsset> = emptyMap(),
     val selectedAssetIds: Set<LocalAssetId> = emptySet(),
     val stagedEditsByAssetId: Map<LocalAssetId, AssetEditPatch> = emptyMap(),
-    val bulkEditDraft: BulkEditDraft = BulkEditDraft()
+    val bulkEditDraft: BulkEditDraft = BulkEditDraft(),
+    val apiKey: String = "",
+    val albumCreateDraft: String = "",
+    val tagCreateDraft: String = "",
+    val availableAlbums: List<ImmichCatalogEntry> = emptyList(),
+    val availableTags: List<ImmichCatalogEntry> = emptyList(),
+    val catalogStatus: CatalogUiStatus = CatalogUiStatus.Idle,
+    val catalogMessage: String? = null
 )
+
+enum class CatalogUiStatus {
+    Idle,
+    Loading,
+    Ready,
+    BlockedMissingApiKey
+}
 
 sealed interface UploadPrepAction {
     data class ReplaceAssets(val assets: List<LocalAsset>) : UploadPrepAction
@@ -36,6 +50,14 @@ sealed interface UploadPrepAction {
     data class SetBulkEditDraft(val draft: BulkEditDraft) : UploadPrepAction
     data object ApplyBulkEditDraftToSelected : UploadPrepAction
     data object ClearBulkEditDraft : UploadPrepAction
+    data class SetApiKey(val value: String) : UploadPrepAction
+    data class SetAlbumCreateDraft(val value: String) : UploadPrepAction
+    data class SetTagCreateDraft(val value: String) : UploadPrepAction
+    data object CatalogRequestStarted : UploadPrepAction
+    data class CatalogAlbumsLoaded(val albums: List<ImmichCatalogEntry>, val message: String) : UploadPrepAction
+    data class CatalogTagsLoaded(val tags: List<ImmichCatalogEntry>, val message: String) : UploadPrepAction
+    data class CatalogBlockedMissingApiKey(val message: String) : UploadPrepAction
+    data object ClearCatalogMessage : UploadPrepAction
 }
 
 fun reduceUploadPrepState(state: UploadPrepState, action: UploadPrepAction): UploadPrepState =
@@ -87,6 +109,36 @@ fun reduceUploadPrepState(state: UploadPrepState, action: UploadPrepAction): Upl
         }
 
         UploadPrepAction.ClearBulkEditDraft -> state.copy(bulkEditDraft = BulkEditDraft())
+
+        is UploadPrepAction.SetApiKey -> state.copy(apiKey = action.value)
+
+        is UploadPrepAction.SetAlbumCreateDraft -> state.copy(albumCreateDraft = action.value)
+
+        is UploadPrepAction.SetTagCreateDraft -> state.copy(tagCreateDraft = action.value)
+
+        UploadPrepAction.CatalogRequestStarted -> state.copy(
+            catalogStatus = CatalogUiStatus.Loading,
+            catalogMessage = null
+        )
+
+        is UploadPrepAction.CatalogAlbumsLoaded -> state.copy(
+            availableAlbums = action.albums.sortedBy { it.name.lowercase() },
+            catalogStatus = CatalogUiStatus.Ready,
+            catalogMessage = action.message
+        )
+
+        is UploadPrepAction.CatalogTagsLoaded -> state.copy(
+            availableTags = action.tags.sortedBy { it.name.lowercase() },
+            catalogStatus = CatalogUiStatus.Ready,
+            catalogMessage = action.message
+        )
+
+        is UploadPrepAction.CatalogBlockedMissingApiKey -> state.copy(
+            catalogStatus = CatalogUiStatus.BlockedMissingApiKey,
+            catalogMessage = action.message
+        )
+
+        UploadPrepAction.ClearCatalogMessage -> state.copy(catalogMessage = null)
     }
 
 private fun stagePatchForIds(

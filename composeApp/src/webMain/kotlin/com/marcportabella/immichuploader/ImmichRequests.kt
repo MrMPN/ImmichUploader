@@ -33,12 +33,60 @@ data class ImmichAlbumCreateRequest(val name: String)
 
 data class ImmichTagCreateRequest(val name: String)
 
+data class ImmichApiRequest(
+    val method: String,
+    val url: String,
+    val body: String? = null
+)
+
+object ImmichCatalogRequestBuilder {
+    fun lookupAlbums(): ImmichApiRequest =
+        ImmichApiRequest(
+            method = "GET",
+            url = "$IMMICH_API_BASE_URL/albums"
+        )
+
+    fun lookupTags(): ImmichApiRequest =
+        ImmichApiRequest(
+            method = "GET",
+            url = "$IMMICH_API_BASE_URL/tags"
+        )
+
+    fun createAlbum(name: String): ImmichApiRequest =
+        ImmichApiRequest(
+            method = "POST",
+            url = "$IMMICH_API_BASE_URL/albums",
+            body = """{"name":"${name.trim().escapeJson()}"}"""
+        )
+
+    fun createTag(name: String): ImmichApiRequest =
+        ImmichApiRequest(
+            method = "POST",
+            url = "$IMMICH_API_BASE_URL/tags",
+            body = """{"name":"${name.trim().escapeJson()}"}"""
+        )
+}
+
 sealed interface ImmichLookupHook {
     data object LookupAlbums : ImmichLookupHook
     data object LookupTags : ImmichLookupHook
     data class CreateAlbumIfMissing(val name: String) : ImmichLookupHook
     data class CreateTagIfMissing(val name: String) : ImmichLookupHook
 }
+
+private fun String.escapeJson(): String =
+    buildString(length) {
+        for (char in this@escapeJson) {
+            when (char) {
+                '\\' -> append("\\\\")
+                '"' -> append("\\\"")
+                '\n' -> append("\\n")
+                '\r' -> append("\\r")
+                '\t' -> append("\\t")
+                else -> append(char)
+            }
+        }
+    }
 
 data class ImmichRequestPlan(
     val uploadRequests: List<ImmichUploadRequest> = emptyList(),

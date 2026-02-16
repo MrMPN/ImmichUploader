@@ -2,6 +2,7 @@ package com.marcportabella.immichuploader
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -172,6 +173,77 @@ class ComposeAppWebTest {
         assertTrue(hooks[1] is ImmichLookupHook.LookupTags)
         assertTrue(hooks[2] is ImmichLookupHook.CreateAlbumIfMissing)
         assertTrue(hooks[3] is ImmichLookupHook.CreateTagIfMissing)
+    }
+
+    @Test
+    fun catalogRequestBuilderUsesFixedBaseUrlContracts() {
+        val albumsLookup = ImmichCatalogRequestBuilder.lookupAlbums()
+        val tagsLookup = ImmichCatalogRequestBuilder.lookupTags()
+        val createAlbum = ImmichCatalogRequestBuilder.createAlbum("Family")
+        val createTag = ImmichCatalogRequestBuilder.createTag("Trip")
+
+        assertEquals("GET", albumsLookup.method)
+        assertEquals("$IMMICH_API_BASE_URL/albums", albumsLookup.url)
+        assertNull(albumsLookup.body)
+
+        assertEquals("GET", tagsLookup.method)
+        assertEquals("$IMMICH_API_BASE_URL/tags", tagsLookup.url)
+        assertNull(tagsLookup.body)
+
+        assertEquals("POST", createAlbum.method)
+        assertEquals("$IMMICH_API_BASE_URL/albums", createAlbum.url)
+        assertEquals("""{"name":"Family"}""", createAlbum.body)
+
+        assertEquals("POST", createTag.method)
+        assertEquals("$IMMICH_API_BASE_URL/tags", createTag.url)
+        assertEquals("""{"name":"Trip"}""", createTag.body)
+    }
+
+    @Test
+    fun catalogReducerTracksLoadingBlockedAndReadyStates() {
+        val loading = reduceUploadPrepState(
+            UploadPrepState(),
+            UploadPrepAction.CatalogRequestStarted
+        )
+        assertEquals(CatalogUiStatus.Loading, loading.catalogStatus)
+
+        val blocked = reduceUploadPrepState(
+            loading,
+            UploadPrepAction.CatalogBlockedMissingApiKey("missing key")
+        )
+        assertEquals(CatalogUiStatus.BlockedMissingApiKey, blocked.catalogStatus)
+        assertEquals("missing key", blocked.catalogMessage)
+
+        val ready = reduceUploadPrepState(
+            blocked,
+            UploadPrepAction.CatalogAlbumsLoaded(
+                albums = listOf(
+                    ImmichCatalogEntry("2", "Zoo"),
+                    ImmichCatalogEntry("1", "Family")
+                ),
+                message = "loaded"
+            )
+        )
+        assertEquals(CatalogUiStatus.Ready, ready.catalogStatus)
+        assertEquals(listOf("Family", "Zoo"), ready.availableAlbums.map { it.name })
+        assertEquals("loaded", ready.catalogMessage)
+    }
+
+    @Test
+    fun catalogTransportBlocksWhenApiKeyMissingAndSupportsDryRunCreation() {
+        val transport = ApiKeyGatedImmichCatalogTransport(DryRunImmichCatalogTransport())
+
+        val blocked = transport.lookupAlbums(apiKey = null)
+        assertIs<ImmichCatalogResult.BlockedMissingApiKey>(blocked)
+
+        val createdAlbum = transport.createAlbumIfMissing(apiKey = "k", name = "Family")
+        assertIs<ImmichCatalogResult.DryRunSuccess>(createdAlbum)
+        assertEquals(1, createdAlbum.entries.size)
+        assertEquals("Family", createdAlbum.entries.first().name)
+
+        val loadedAlbums = transport.lookupAlbums(apiKey = "k")
+        assertIs<ImmichCatalogResult.DryRunSuccess>(loadedAlbums)
+        assertEquals(1, loadedAlbums.entries.size)
     }
 
     @Test
