@@ -1,8 +1,11 @@
 package com.marcportabella.immichuploader.ui
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -11,6 +14,10 @@ import androidx.compose.foundation.layout.safeContentPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -18,6 +25,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.marcportabella.immichuploader.data.ApiImmichOnlineTransport
 import com.marcportabella.immichuploader.data.ApiKeyGatedImmichCatalogTransport
@@ -25,7 +33,6 @@ import com.marcportabella.immichuploader.data.ApiKeyGatedImmichTransport
 import com.marcportabella.immichuploader.data.DryRunImmichCatalogTransport
 import com.marcportabella.immichuploader.data.ImmichCatalogResult
 import com.marcportabella.immichuploader.data.ImmichTransportResult
-import com.marcportabella.immichuploader.domain.LocalAssetId
 import com.marcportabella.immichuploader.domain.UploadExecutionStatus
 import com.marcportabella.immichuploader.domain.UploadPrepAction
 import com.marcportabella.immichuploader.domain.UploadPrepStore
@@ -39,6 +46,7 @@ import kotlinx.coroutines.launch
 import org.w3c.dom.HTMLInputElement
 import org.w3c.dom.events.Event
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun UploadPrepScreen(store: UploadPrepStore) {
     val state = store.state
@@ -88,27 +96,70 @@ fun UploadPrepScreen(store: UploadPrepStore) {
 
     Column(
         modifier = Modifier
-            .background(androidx.compose.material3.MaterialTheme.colorScheme.primaryContainer)
+            .background(MaterialTheme.colorScheme.background)
             .safeContentPadding()
             .fillMaxSize()
-            .padding(24.dp)
+            .padding(horizontal = 16.dp, vertical = 20.dp)
             .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text("Immich Upload Prep")
-        Text("Assets loaded: ${state.assets.size}")
-        Text("Selected: ${state.selectedAssetIds.size}")
-        Text("Staged edits: ${state.stagedEditsByAssetId.size}")
-        Text("Transport gate: $gateStatus")
-        Text("Execution path: $executionPath")
-        Text("Catalog gate: $catalogGateStatus")
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "Immich Upload Prep",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = "Prepare metadata, validate the dry-run payload, then execute upload safely.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    SummaryPill("Assets", state.assets.size.toString())
+                    SummaryPill("Selected", state.selectedAssetIds.size.toString())
+                    SummaryPill("Staged", state.stagedEditsByAssetId.size.toString())
+                    SummaryPill("Transport", gateStatus.toString())
+                    SummaryPill("Execution", executionPath.toString())
+                    SummaryPill("Catalog", catalogGateStatus.toString())
+                }
+            }
+        }
 
-        OutlinedTextField(
-            value = state.apiKey,
-            onValueChange = { store.dispatch(UploadPrepAction.SetApiKey(it)) },
-            label = { Text("Immich API key (required for lookup/create)") },
-            modifier = Modifier.fillMaxWidth()
-        )
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    "Connection",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    "API key is required for catalog lookups, catalog create operations, and upload execution.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                OutlinedTextField(
+                    value = state.apiKey,
+                    onValueChange = { store.dispatch(UploadPrepAction.SetApiKey(it)) },
+                    label = { Text("Immich API key") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
 
         CatalogSection(
             state = state,
@@ -179,31 +230,49 @@ fun UploadPrepScreen(store: UploadPrepStore) {
             onClearMessage = { store.dispatch(UploadPrepAction.ClearCatalogMessage) }
         )
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(
-                modifier = Modifier.padding(top = 8.dp),
-                onClick = {
-                    val input = document.getElementById("local-file-input") as? HTMLInputElement
-                    input?.click()
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    "Queue selection",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    "Load local media first, then select assets for bulk actions and dry-run generation.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            val input = document.getElementById("local-file-input") as? HTMLInputElement
+                            input?.click()
+                        }
+                    ) {
+                        Text("Select local media")
+                    }
+                    Button(
+                        onClick = { store.dispatch(UploadPrepAction.SelectAll) },
+                        enabled = state.assets.isNotEmpty()
+                    ) {
+                        Text("Select all")
+                    }
+                    Button(
+                        onClick = { store.dispatch(UploadPrepAction.ClearSelection) },
+                        enabled = state.selectedAssetIds.isNotEmpty()
+                    ) {
+                        Text("Clear selection")
+                    }
                 }
-            ) {
-                Text("Select local media")
-            }
-
-            Button(
-                modifier = Modifier.padding(top = 8.dp),
-                onClick = { store.dispatch(UploadPrepAction.SelectAll) },
-                enabled = state.assets.isNotEmpty()
-            ) {
-                Text("Select all")
-            }
-
-            Button(
-                modifier = Modifier.padding(top = 8.dp),
-                onClick = { store.dispatch(UploadPrepAction.ClearSelection) },
-                enabled = state.selectedAssetIds.isNotEmpty()
-            ) {
-                Text("Clear selection")
             }
         }
 
@@ -225,79 +294,102 @@ fun UploadPrepScreen(store: UploadPrepStore) {
             )
         }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(
-                onClick = { store.dispatch(UploadPrepAction.GenerateDryRunPreview) },
-                enabled = state.selectedAssetIds.isNotEmpty()
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .animateContentSize(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Text("Generate dry-run plan")
-            }
-            Button(
-                onClick = { store.dispatch(UploadPrepAction.ClearDryRunPreview) },
-                enabled = state.dryRunPlan != null
-            ) {
-                Text("Clear dry-run")
-            }
-        }
-
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(
-                onClick = {
-                    val plan = state.dryRunPlan ?: return@Button
-                    scope.launch {
-                        store.dispatch(
-                            UploadPrepAction.UploadExecutionStarted(
-                                "Executing ${state.dryRunApiRequests.size} API requests."
-                            )
-                        )
-                        when (val result = transport.submit(plan = plan, apiKey = state.apiKey.ifBlank { null })) {
-                            is ImmichTransportResult.BlockedMissingApiKey ->
-                                store.dispatch(
-                                    UploadPrepAction.UploadExecutionBlocked(
-                                        "API key required. Upload execution remained blocked."
-                                    )
-                                )
-
-                            is ImmichTransportResult.DryRun ->
-                                store.dispatch(
-                                    UploadPrepAction.UploadExecutionFailed(
-                                        "Execution stayed in dry-run mode. Configure executable transport first."
-                                    )
-                                )
-
-                            is ImmichTransportResult.Submitted ->
-                                store.dispatch(
-                                    UploadPrepAction.UploadExecutionSubmitted(
-                                        requestCount = result.requestCount,
-                                        message = "Submitted ${result.requestCount} API requests."
-                                    )
-                                )
-
-                            is ImmichTransportResult.Failed ->
-                                store.dispatch(
-                                    UploadPrepAction.UploadExecutionFailed(result.message)
-                                )
-                        }
+                Text(
+                    "Dry-run and execution",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    "Generate a preview before execution to verify payload details and request count.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = { store.dispatch(UploadPrepAction.GenerateDryRunPreview) },
+                        enabled = state.selectedAssetIds.isNotEmpty()
+                    ) {
+                        Text("Generate dry-run plan")
                     }
-                },
-                enabled = state.dryRunPlan != null && state.executionStatus != UploadExecutionStatus.Executing
-            ) {
-                Text("Execute API upload")
-            }
-            Button(
-                onClick = { store.dispatch(UploadPrepAction.ClearUploadExecutionStatus) },
-                enabled = state.executionMessage != null || state.executionStatus != UploadExecutionStatus.Idle
-            ) {
-                Text("Clear execution status")
-            }
-        }
+                    Button(
+                        onClick = { store.dispatch(UploadPrepAction.ClearDryRunPreview) },
+                        enabled = state.dryRunPlan != null
+                    ) {
+                        Text("Clear dry-run")
+                    }
+                    Button(
+                        onClick = {
+                            val plan = state.dryRunPlan ?: return@Button
+                            scope.launch {
+                                store.dispatch(
+                                    UploadPrepAction.UploadExecutionStarted(
+                                        "Executing ${state.dryRunApiRequests.size} API requests."
+                                    )
+                                )
+                                when (val result = transport.submit(plan = plan, apiKey = state.apiKey.ifBlank { null })) {
+                                    is ImmichTransportResult.BlockedMissingApiKey ->
+                                        store.dispatch(
+                                            UploadPrepAction.UploadExecutionBlocked(
+                                                "API key required. Upload execution remained blocked."
+                                            )
+                                        )
 
-        Text("Execution status: ${state.executionStatus}")
-        if (state.executionMessage != null) {
-            Text("Execution message: ${state.executionMessage}")
-        }
-        if (state.executionRequestCount != null) {
-            Text("Submitted requests: ${state.executionRequestCount}")
+                                    is ImmichTransportResult.DryRun ->
+                                        store.dispatch(
+                                            UploadPrepAction.UploadExecutionFailed(
+                                                "Execution stayed in dry-run mode. Configure executable transport first."
+                                            )
+                                        )
+
+                                    is ImmichTransportResult.Submitted ->
+                                        store.dispatch(
+                                            UploadPrepAction.UploadExecutionSubmitted(
+                                                requestCount = result.requestCount,
+                                                message = "Submitted ${result.requestCount} API requests."
+                                            )
+                                        )
+
+                                    is ImmichTransportResult.Failed ->
+                                        store.dispatch(
+                                            UploadPrepAction.UploadExecutionFailed(result.message)
+                                        )
+                                }
+                            }
+                        },
+                        enabled = state.dryRunPlan != null && state.executionStatus != UploadExecutionStatus.Executing
+                    ) {
+                        Text("Execute API upload")
+                    }
+                    Button(
+                        onClick = { store.dispatch(UploadPrepAction.ClearUploadExecutionStatus) },
+                        enabled = state.executionMessage != null || state.executionStatus != UploadExecutionStatus.Idle
+                    ) {
+                        Text("Clear execution status")
+                    }
+                }
+
+                HorizontalDivider()
+                Text("Execution status: ${state.executionStatus}")
+                if (state.executionMessage != null) {
+                    Text("Execution message: ${state.executionMessage}")
+                }
+                if (state.executionRequestCount != null) {
+                    Text("Submitted requests: ${state.executionRequestCount}")
+                }
+            }
         }
 
         DryRunInspectorSection(state)
@@ -306,5 +398,24 @@ fun UploadPrepScreen(store: UploadPrepStore) {
             state = state,
             onToggleSelection = { store.dispatch(UploadPrepAction.ToggleSelection(it)) }
         )
+    }
+}
+
+@Composable
+private fun SummaryPill(label: String, value: String) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(text = "$label:", style = MaterialTheme.typography.labelMedium)
+            Text(
+                text = value,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
     }
 }

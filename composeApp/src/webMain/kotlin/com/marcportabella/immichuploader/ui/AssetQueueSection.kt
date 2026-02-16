@@ -1,13 +1,19 @@
 package com.marcportabella.immichuploader.ui
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.marcportabella.immichuploader.domain.AssetEditPatch
 import com.marcportabella.immichuploader.domain.FieldPatch
@@ -20,31 +26,62 @@ fun AssetQueueSection(
     state: UploadPrepState,
     onToggleSelection: (LocalAssetId) -> Unit
 ) {
-    if (state.assets.isEmpty()) {
-        Text("No files selected yet.")
-    } else {
-        Text("Queue")
-        state.assets.values.sortedBy { it.fileName }.forEach { asset ->
-            val patch = state.stagedEditsByAssetId[asset.id]
-            val metadata = asset.toDisplayMetadata(patch)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Checkbox(
-                    checked = asset.id in state.selectedAssetIds,
-                    onCheckedChange = { onToggleSelection(asset.id) }
-                )
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Text(asset.fileName)
-                    Text("${asset.mimeType} · ${asset.fileSizeBytes} bytes")
-                    Text("Date/time: ${metadata.dateTimeOriginal ?: "Unknown"}")
-                    Text("Timezone: ${metadata.timeZone ?: "Unknown"} (read-only)")
-                    Text("Description: ${metadata.description ?: "None"}")
-                    Text("Favorite: ${metadata.isFavorite?.toString() ?: "None"}")
-                    Text("Album: ${metadata.albumId ?: "None"}")
-                    Text("Tags: ${if (metadata.tagIds.isEmpty()) "None" else metadata.tagIds.joinToString(", ")}")
-                    Text(if (asset.previewUrl == null) "No preview" else "Preview ready")
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                "Asset queue",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            if (state.assets.isEmpty()) {
+                Text("No files selected yet.")
+            } else {
+                Text("Sorted by filename for predictable review.")
+
+                state.assets.values.sortedBy { it.fileName }.forEach { asset ->
+                    val patch = state.stagedEditsByAssetId[asset.id]
+                    val metadata = asset.toDisplayMetadata(patch)
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Checkbox(
+                                checked = asset.id in state.selectedAssetIds,
+                                onCheckedChange = { onToggleSelection(asset.id) }
+                            )
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                Text(asset.fileName, fontWeight = FontWeight.Medium)
+                                Text("${asset.mimeType} · ${asset.fileSizeBytes} bytes")
+                                Text("Date/time: ${metadata.dateTimeOriginal ?: "Unknown"}")
+                                Text("Timezone: ${metadata.timeZone ?: "Unknown"} (read-only)")
+                                Text("Description: ${metadata.description ?: "None"}")
+                                Text("Favorite: ${metadata.isFavorite?.toString() ?: "None"}")
+                                Text("Album: ${metadata.albumId ?: "None"}")
+                                Text("Tags: ${if (metadata.tagIds.isEmpty()) "None" else metadata.tagIds.joinToString(", ")}")
+                                Text(if (asset.previewUrl == null) "No preview" else "Preview ready")
+                            }
+                        }
+                    }
                 }
             }
         }

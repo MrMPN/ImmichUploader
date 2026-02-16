@@ -6,16 +6,25 @@
     <title>ImmichUploader</title>
     <link type="text/css" rel="stylesheet" href="styles.css">
 </head>
-<body style="text-align: center; align-content: center">
-<input id="local-file-input" type="file" multiple accept="image/*,video/*" style="display: none" />
-<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 50 50" role="presentation">
-    <circle cx="25" cy="25" r="20" stroke="#ccc" stroke-width="4" fill="none"/>
-    <circle cx="25" cy="25" r="20" stroke="#333" stroke-width="4" fill="none" stroke-linecap="round"
-            stroke-dasharray="90 125">
-        <animateTransform attributeName="transform" type="rotate" from="0 25 25" to="360 25 25" dur="1s"
-                          repeatCount="indefinite"/>
-    </circle>
-</svg>
+<body>
+<input id="local-file-input" type="file" multiple accept="image/*,video/*"/>
+<div id="boot-loader" aria-hidden="true">
+    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 50 50" role="presentation">
+        <circle cx="25" cy="25" r="20" stroke="#c4d3ec" stroke-width="4" fill="none"/>
+        <circle cx="25" cy="25" r="20" stroke="#0b57d0" stroke-width="4" fill="none" stroke-linecap="round"
+                stroke-dasharray="92 122"/>
+    </svg>
+</div>
 <script type="application/javascript" src="composeApp.js"></script>
+<script>
+    const loader = document.getElementById("boot-loader");
+    const stopLoaderWhenReady = window.setInterval(() => {
+        if (document.querySelector("canvas")) {
+            loader.style.opacity = "0";
+            window.clearInterval(stopLoaderWhenReady);
+            window.setTimeout(() => loader.remove(), 260);
+        }
+    }, 120);
+</script>
 </body>
 </html>
