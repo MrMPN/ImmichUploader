@@ -31,9 +31,9 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.marcportabella.immichuploader.data.ApiImmichOnlineTransport
+import com.marcportabella.immichuploader.data.ApiImmichOnlineCatalogTransport
 import com.marcportabella.immichuploader.data.ApiKeyGatedImmichCatalogTransport
 import com.marcportabella.immichuploader.data.ApiKeyGatedImmichTransport
-import com.marcportabella.immichuploader.data.DryRunImmichCatalogTransport
 import com.marcportabella.immichuploader.data.ImmichCatalogResult
 import com.marcportabella.immichuploader.data.ImmichTransportResult
 import com.marcportabella.immichuploader.domain.AssetEditPatch
@@ -101,7 +101,7 @@ fun UploadPrepScreen(store: UploadPrepStore) {
     val transport = remember { ApiKeyGatedImmichTransport(ApiImmichOnlineTransport()) }
     val gateStatus = transport.gateStatus(apiKey = state.apiKey.ifBlank { null })
     val executionPath = transport.selectExecutionPath(apiKey = state.apiKey.ifBlank { null })
-    val catalogTransport = remember { ApiKeyGatedImmichCatalogTransport(DryRunImmichCatalogTransport()) }
+    val catalogTransport = remember { ApiKeyGatedImmichCatalogTransport(ApiImmichOnlineCatalogTransport()) }
     val catalogGateStatus = catalogTransport.gateStatus(state.apiKey.ifBlank { null })
     val bulkPreflightFeedback = preflightBulkEditDraft(state)
     val sortedAssets = remember(state.assets) { state.assets.values.sortedBy { it.fileName } }

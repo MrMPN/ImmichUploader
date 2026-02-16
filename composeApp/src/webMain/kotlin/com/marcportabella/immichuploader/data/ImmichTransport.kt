@@ -1,6 +1,11 @@
 package com.marcportabella.immichuploader.data
 
 import kotlinx.coroutines.await
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.js.JsAny
 import kotlin.js.Promise
 
@@ -157,31 +162,31 @@ class ApiImmichOnlineTransport(
 }
 
 interface ImmichOnlineCatalogTransport {
-    fun lookupAlbums(apiKey: String): ImmichCatalogResult.DryRunSuccess
-    fun lookupTags(apiKey: String): ImmichCatalogResult.DryRunSuccess
-    fun createAlbumIfMissing(apiKey: String, name: String): ImmichCatalogResult.DryRunSuccess
-    fun createTagIfMissing(apiKey: String, name: String): ImmichCatalogResult.DryRunSuccess
+    suspend fun lookupAlbums(apiKey: String): ImmichCatalogResult.DryRunSuccess
+    suspend fun lookupTags(apiKey: String): ImmichCatalogResult.DryRunSuccess
+    suspend fun createAlbumIfMissing(apiKey: String, name: String): ImmichCatalogResult.DryRunSuccess
+    suspend fun createTagIfMissing(apiKey: String, name: String): ImmichCatalogResult.DryRunSuccess
 }
 
 class DryRunImmichCatalogTransport : ImmichOnlineCatalogTransport {
     private val albums = linkedMapOf<String, ImmichCatalogEntry>()
     private val tags = linkedMapOf<String, ImmichCatalogEntry>()
 
-    override fun lookupAlbums(apiKey: String): ImmichCatalogResult.DryRunSuccess =
+    override suspend fun lookupAlbums(apiKey: String): ImmichCatalogResult.DryRunSuccess =
         ImmichCatalogResult.DryRunSuccess(
             request = ImmichCatalogRequestBuilder.lookupAlbums(),
             entries = albums.values.sortedBy { it.name.lowercase() },
             message = "Dry-run albums loaded."
         )
 
-    override fun lookupTags(apiKey: String): ImmichCatalogResult.DryRunSuccess =
+    override suspend fun lookupTags(apiKey: String): ImmichCatalogResult.DryRunSuccess =
         ImmichCatalogResult.DryRunSuccess(
             request = ImmichCatalogRequestBuilder.lookupTags(),
             entries = tags.values.sortedBy { it.name.lowercase() },
             message = "Dry-run tags loaded."
         )
 
-    override fun createAlbumIfMissing(apiKey: String, name: String): ImmichCatalogResult.DryRunSuccess {
+    override suspend fun createAlbumIfMissing(apiKey: String, name: String): ImmichCatalogResult.DryRunSuccess {
         val normalized = name.trim()
         val existing = albums.values.firstOrNull { it.name.equals(normalized, ignoreCase = true) }
         if (existing == null) {
@@ -198,7 +203,7 @@ class DryRunImmichCatalogTransport : ImmichOnlineCatalogTransport {
         )
     }
 
-    override fun createTagIfMissing(apiKey: String, name: String): ImmichCatalogResult.DryRunSuccess {
+    override suspend fun createTagIfMissing(apiKey: String, name: String): ImmichCatalogResult.DryRunSuccess {
         val normalized = name.trim()
         val existing = tags.values.firstOrNull { it.name.equals(normalized, ignoreCase = true) }
         if (existing == null) {
@@ -216,6 +221,98 @@ class DryRunImmichCatalogTransport : ImmichOnlineCatalogTransport {
     }
 }
 
+class ApiImmichOnlineCatalogTransport(
+    private val executor: ImmichApiExecutor = BrowserImmichApiExecutor()
+) : ImmichOnlineCatalogTransport {
+    private val json = Json { ignoreUnknownKeys = true }
+
+    override suspend fun lookupAlbums(apiKey: String): ImmichCatalogResult.DryRunSuccess {
+        val request = ImmichCatalogRequestBuilder.lookupAlbums()
+        val result = execute(request, apiKey)
+        val entries = if (result != null && result.statusCode in 200..299) {
+            parseEntries(result.responseBody, nameKeys = listOf("albumName", "name"))
+        } else {
+            emptyList()
+        }
+
+        val message = when {
+            result == null -> "Album lookup failed before response."
+            result.statusCode !in 200..299 -> "Album lookup failed with HTTP ${result.statusCode}."
+            else -> "Loaded ${entries.size} albums from server."
+        }
+
+        return ImmichCatalogResult.DryRunSuccess(request = request, entries = entries, message = message)
+    }
+
+    override suspend fun lookupTags(apiKey: String): ImmichCatalogResult.DryRunSuccess {
+        val request = ImmichCatalogRequestBuilder.lookupTags()
+        val result = execute(request, apiKey)
+        val entries = if (result != null && result.statusCode in 200..299) {
+            parseEntries(result.responseBody, nameKeys = listOf("value", "name"))
+        } else {
+            emptyList()
+        }
+
+        val message = when {
+            result == null -> "Tag lookup failed before response."
+            result.statusCode !in 200..299 -> "Tag lookup failed with HTTP ${result.statusCode}."
+            else -> "Loaded ${entries.size} tags from server."
+        }
+
+        return ImmichCatalogResult.DryRunSuccess(request = request, entries = entries, message = message)
+    }
+
+    override suspend fun createAlbumIfMissing(apiKey: String, name: String): ImmichCatalogResult.DryRunSuccess {
+        val request = ImmichCatalogRequestBuilder.createAlbum(name)
+        val createResult = execute(request, apiKey)
+        if (createResult == null) {
+            return ImmichCatalogResult.DryRunSuccess(request = request, entries = emptyList(), message = "Album create failed before response.")
+        }
+        return if (createResult.statusCode in 200..299 || createResult.statusCode == 409) {
+            val refreshed = lookupAlbums(apiKey)
+            refreshed.copy(message = "Album ensure requested for \"$name\". ${refreshed.message}")
+        } else {
+            ImmichCatalogResult.DryRunSuccess(
+                request = request,
+                entries = emptyList(),
+                message = "Album create failed with HTTP ${createResult.statusCode}."
+            )
+        }
+    }
+
+    override suspend fun createTagIfMissing(apiKey: String, name: String): ImmichCatalogResult.DryRunSuccess {
+        val request = ImmichCatalogRequestBuilder.createTag(name)
+        val createResult = execute(request, apiKey)
+        if (createResult == null) {
+            return ImmichCatalogResult.DryRunSuccess(request = request, entries = emptyList(), message = "Tag create failed before response.")
+        }
+        return if (createResult.statusCode in 200..299 || createResult.statusCode == 409) {
+            val refreshed = lookupTags(apiKey)
+            refreshed.copy(message = "Tag ensure requested for \"$name\". ${refreshed.message}")
+        } else {
+            ImmichCatalogResult.DryRunSuccess(
+                request = request,
+                entries = emptyList(),
+                message = "Tag create failed with HTTP ${createResult.statusCode}."
+            )
+        }
+    }
+
+    private suspend fun execute(request: ImmichApiRequest, apiKey: String): ImmichApiExecutorResult? =
+        runCatching { executor.execute(request = request, apiKey = apiKey) }.getOrNull()
+
+    private fun parseEntries(responseBody: String, nameKeys: List<String>): List<ImmichCatalogEntry> {
+        val root = runCatching { json.parseToJsonElement(responseBody) }.getOrNull() ?: return emptyList()
+        val array = root as? JsonArray ?: return emptyList()
+        return array.mapNotNull { element ->
+            val obj = element as? JsonObject ?: return@mapNotNull null
+            val id = obj["id"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+            val name = nameKeys.firstNotNullOfOrNull { key -> obj[key]?.jsonPrimitive?.contentOrNull } ?: return@mapNotNull null
+            ImmichCatalogEntry(id = id, name = name)
+        }.distinctBy { it.id }.sortedBy { it.name.lowercase() }
+    }
+}
+
 class ApiKeyGatedImmichCatalogTransport(
     private val onlineTransport: ImmichOnlineCatalogTransport
 ) {
@@ -224,7 +321,7 @@ class ApiKeyGatedImmichCatalogTransport(
     fun gateStatus(apiKey: String?): TransportGateStatus =
         if (apiKey.isNullOrBlank()) TransportGateStatus.MissingApiKey else TransportGateStatus.Ready
 
-    fun lookupAlbums(apiKey: String?): ImmichCatalogResult {
+    suspend fun lookupAlbums(apiKey: String?): ImmichCatalogResult {
         val request = ImmichCatalogRequestBuilder.lookupAlbums()
         if (gateStatus(apiKey) == TransportGateStatus.MissingApiKey) {
             return ImmichCatalogResult.BlockedMissingApiKey(request, blockedMessage)
@@ -232,7 +329,7 @@ class ApiKeyGatedImmichCatalogTransport(
         return onlineTransport.lookupAlbums(apiKey.orEmpty())
     }
 
-    fun lookupTags(apiKey: String?): ImmichCatalogResult {
+    suspend fun lookupTags(apiKey: String?): ImmichCatalogResult {
         val request = ImmichCatalogRequestBuilder.lookupTags()
         if (gateStatus(apiKey) == TransportGateStatus.MissingApiKey) {
             return ImmichCatalogResult.BlockedMissingApiKey(request, blockedMessage)
@@ -240,7 +337,7 @@ class ApiKeyGatedImmichCatalogTransport(
         return onlineTransport.lookupTags(apiKey.orEmpty())
     }
 
-    fun createAlbumIfMissing(apiKey: String?, name: String): ImmichCatalogResult {
+    suspend fun createAlbumIfMissing(apiKey: String?, name: String): ImmichCatalogResult {
         val normalized = name.trim()
         val request = ImmichCatalogRequestBuilder.createAlbum(normalized)
         if (gateStatus(apiKey) == TransportGateStatus.MissingApiKey) {
@@ -256,7 +353,7 @@ class ApiKeyGatedImmichCatalogTransport(
         return onlineTransport.createAlbumIfMissing(apiKey.orEmpty(), normalized)
     }
 
-    fun createTagIfMissing(apiKey: String?, name: String): ImmichCatalogResult {
+    suspend fun createTagIfMissing(apiKey: String?, name: String): ImmichCatalogResult {
         val normalized = name.trim()
         val request = ImmichCatalogRequestBuilder.createTag(normalized)
         if (gateStatus(apiKey) == TransportGateStatus.MissingApiKey) {
