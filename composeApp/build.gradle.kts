@@ -10,15 +10,16 @@ plugins {
 kotlin {
     js {
         browser()
+        nodejs()
         binaries.executable()
     }
-    
+
     @OptIn(ExperimentalWasmDsl::class)
     wasmJs {
         browser()
         binaries.executable()
     }
-    
+
     sourceSets {
         commonMain.dependencies {
             implementation(libs.compose.runtime)
@@ -36,4 +37,11 @@ kotlin {
     }
 }
 
+// Verification handoffs expect these task names for web checks.
+tasks.register("compileKotlinWeb") {
+    dependsOn(":composeApp:compileKotlinJs")
+}
 
+tasks.register("webTest") {
+    dependsOn(":composeApp:jsNodeTest")
+}
