@@ -1,5 +1,6 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.util.Properties
 
 val bootstrapConfigOutputDir = layout.buildDirectory.dir("generated/source/bootstrapConfig/webMain/kotlin")
@@ -19,6 +20,7 @@ val bootstrapApiKey = providers.gradleProperty("immichApiKey")
     .orElse("")
 
 plugins {
+    alias(libs.plugins.androidLibrary)
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.kotlinSerialization)
     alias(libs.plugins.composeMultiplatform)
@@ -26,6 +28,12 @@ plugins {
 }
 
 kotlin {
+    androidTarget {
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_11)
+        }
+    }
+
     @OptIn(ExperimentalWasmDsl::class)
     wasmJs {
         browser()
@@ -35,6 +43,9 @@ kotlin {
     sourceSets {
         matching { it.name == "webMain" }.configureEach {
             kotlin.srcDir(bootstrapConfigOutputDir)
+        }
+        androidMain.dependencies {
+            implementation(libs.compose.uiToolingPreview)
         }
         commonMain.dependencies {
             implementation(libs.kotlinx.datetime)
@@ -52,6 +63,19 @@ kotlin {
             implementation(libs.kotlin.test)
         }
     }
+}
+
+android {
+    namespace = "com.marcportabella.immichuploader"
+    compileSdk = libs.versions.android.compileSdk.get().toInt()
+
+    defaultConfig {
+        minSdk = libs.versions.android.minSdk.get().toInt()
+    }
+}
+
+dependencies {
+    debugImplementation(libs.compose.uiTooling)
 }
 
 val bootstrapConfigFile = bootstrapConfigOutputDir.get()
