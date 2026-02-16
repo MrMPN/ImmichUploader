@@ -76,21 +76,30 @@ private fun createRequestInit(
     method: String,
     headers: Headers,
     body: String?
-): RequestInit {
-    val init = jsEmptyObject().unsafeCast<RequestInit>()
-    init.method = method
-    init.headers = headers
-    if (body != null) {
-        init.body = body
-    }
-    return init
+): RequestInit = if (body == null) {
+    jsRequestInit(method, headers)
+} else {
+    jsRequestInitWithBody(method, headers, body)
 }
-
-@OptIn(ExperimentalWasmJsInterop::class)
-private fun jsEmptyObject(): JsAny = js("{}")
 
 @OptIn(ExperimentalWasmJsInterop::class)
 private fun jsNewHeaders(): JsAny = js("new Headers()")
 
 @OptIn(ExperimentalWasmJsInterop::class)
 private fun createHeaders(): Headers = jsNewHeaders().unsafeCast<Headers>()
+
+@OptIn(ExperimentalWasmJsInterop::class)
+private fun jsRequestInit(method: String, headers: Headers): RequestInit =
+    jsRequestInitAny(method, headers).unsafeCast<RequestInit>()
+
+@OptIn(ExperimentalWasmJsInterop::class)
+private fun jsRequestInitWithBody(method: String, headers: Headers, body: String): RequestInit =
+    jsRequestInitWithBodyAny(method, headers, body).unsafeCast<RequestInit>()
+
+@OptIn(ExperimentalWasmJsInterop::class)
+private fun jsRequestInitAny(method: String, headers: Headers): JsAny =
+    js("({ method: method, headers: headers })")
+
+@OptIn(ExperimentalWasmJsInterop::class)
+private fun jsRequestInitWithBodyAny(method: String, headers: Headers, body: String): JsAny =
+    js("({ method: method, headers: headers, body: body })")
