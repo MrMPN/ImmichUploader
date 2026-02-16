@@ -8,7 +8,10 @@ fun logError(message: String) {
     browserConsole.error(message)
 }
 
-private external object browserConsole {
+@JsName("console")
+private external val browserConsole: BrowserConsoleBindings
+
+private external interface BrowserConsoleBindings {
     fun log(message: String)
     fun error(message: String)
 }
