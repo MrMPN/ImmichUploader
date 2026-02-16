@@ -68,21 +68,8 @@ fun App() {
             }
         }
 
-        val stagedBulkRequest = remember(state.selectedAssetIds, state.stagedEditsByAssetId) {
-            val selection = state.selectedAssetIds.map { "remote-${it.value}" }.toSet()
-            val combinedPatch = state.selectedAssetIds
-                .mapNotNull { state.stagedEditsByAssetId[it] }
-                .fold<AssetEditPatch, AssetEditPatch?>(null) { acc, patch -> if (acc == null) patch else acc.merge(patch) }
-
-            if (combinedPatch == null) {
-                null
-            } else {
-                ImmichRequestBuilder.buildBulkMetadataRequest(selection, combinedPatch)
-            }
-        }
-
         val transport = remember { ApiKeyGatedImmichTransport(DryRunImmichTransport()) }
-        val gateStatus = transport.gateStatus(apiKey = null)
+        val gateStatus = transport.gateStatus(apiKey = state.apiKey.ifBlank { null })
         val catalogTransport = remember { ApiKeyGatedImmichCatalogTransport(DryRunImmichCatalogTransport()) }
         val catalogGateStatus = catalogTransport.gateStatus(state.apiKey.ifBlank { null })
 
@@ -99,7 +86,6 @@ fun App() {
             Text("Assets loaded: ${state.assets.size}")
             Text("Selected: ${state.selectedAssetIds.size}")
             Text("Staged edits: ${state.stagedEditsByAssetId.size}")
-            Text("Bulk metadata request ready: ${stagedBulkRequest != null}")
             Text("Transport gate: $gateStatus")
             Text("Catalog gate: $catalogGateStatus")
 
@@ -206,6 +192,38 @@ fun App() {
                 onClearSelectedStaged = { store.dispatch(UploadPrepAction.ClearStagedForSelected) }
             )
 
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = {
+                        val plan = ImmichRequestBuilder.buildDryRunPlan(state)
+                        val requests = ImmichRequestBuilder.buildPayloadInspectorRequests(plan)
+                        val message = if (requests.isEmpty()) {
+                            "No operations planned. Select assets and/or stage edits first."
+                        } else {
+                            "Dry-run generated ${requests.size} operations."
+                        }
+                        store.dispatch(
+                            UploadPrepAction.DryRunPreviewGenerated(
+                                plan = plan,
+                                requests = requests,
+                                message = message
+                            )
+                        )
+                    },
+                    enabled = state.assets.isNotEmpty()
+                ) {
+                    Text("Generate dry-run plan")
+                }
+                Button(
+                    onClick = { store.dispatch(UploadPrepAction.ClearDryRunPreview) },
+                    enabled = state.dryRunPlan != null
+                ) {
+                    Text("Clear dry-run")
+                }
+            }
+
+            DryRunInspectorSection(state)
+
             if (state.assets.isEmpty()) {
                 Text("No files selected yet.")
             } else {
@@ -234,6 +252,37 @@ fun App() {
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DryRunInspectorSection(state: UploadPrepState) {
+    Text("Dry-run payload inspector")
+    val plan = state.dryRunPlan
+    val requests = state.dryRunApiRequests
+    Text("Planned operations: ${requests.size}")
+
+    if (plan != null) {
+        Text("Upload ops: ${plan.uploadRequests.size}")
+        Text("Metadata ops: ${plan.bulkMetadataRequests.size}")
+        Text("Tag ops: ${plan.tagAssignRequests.size}")
+        Text("Album ops: ${plan.albumAddRequests.size}")
+        Text("Lookup hooks: ${plan.lookupHooks.size}")
+    }
+
+    if (state.dryRunMessage != null) {
+        Text(state.dryRunMessage)
+    }
+
+    if (requests.isEmpty()) {
+        Text("No payload preview available yet.")
+    } else {
+        requests.forEachIndexed { index, request ->
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text("${index + 1}. ${request.method} ${request.url}")
+                Text("Payload: ${request.body ?: "<none>"}")
             }
         }
     }

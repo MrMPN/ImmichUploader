@@ -275,4 +275,73 @@ class ComposeAppWebTest {
         assertNull(assets[1].previewUrl)
         assertTrue(assets[0].id.value.startsWith("local-photo.jpg-123-"))
     }
+
+    @Test
+    fun dryRunPlanComposesUploadMetadataTagAndAlbumRequestsForSelection() {
+        val a = LocalAssetId("a")
+        val b = LocalAssetId("b")
+        val state = UploadPrepState(
+            assets = mapOf(
+                a to LocalAsset(a, "a.jpg", "image/jpeg", 1, null, null, null),
+                b to LocalAsset(b, "b.jpg", "image/jpeg", 2, null, null, null)
+            ),
+            selectedAssetIds = setOf(a, b),
+            stagedEditsByAssetId = mapOf(
+                a to AssetEditPatch(
+                    description = FieldPatch.Set("caption"),
+                    isFavorite = FieldPatch.Set(true),
+                    albumId = FieldPatch.Set("album-1"),
+                    addTagIds = setOf("tag-1")
+                )
+            ),
+            albumCreateDraft = "Family",
+            tagCreateDraft = "Trip"
+        )
+
+        val plan = ImmichRequestBuilder.buildDryRunPlan(state)
+
+        assertEquals(2, plan.uploadRequests.size)
+        assertEquals(1, plan.bulkMetadataRequests.size)
+        assertEquals(1, plan.tagAssignRequests.size)
+        assertEquals(1, plan.albumAddRequests.size)
+        assertEquals(4, plan.lookupHooks.size)
+        assertEquals(listOf("remote-a"), plan.bulkMetadataRequests.first().ids)
+        assertEquals(listOf("remote-a"), plan.tagAssignRequests.first().assetIds)
+        assertEquals(listOf("remote-a"), plan.albumAddRequests.first().assetIds)
+    }
+
+    @Test
+    fun payloadInspectorBuildsEndpointsAndPayloadsFromPlan() {
+        val state = UploadPrepState(
+            assets = mapOf(
+                LocalAssetId("a") to LocalAsset(
+                    id = LocalAssetId("a"),
+                    fileName = "a.jpg",
+                    mimeType = "image/jpeg",
+                    fileSizeBytes = 1,
+                    previewUrl = null,
+                    captureDateTime = "2026-02-01T00:00:00Z",
+                    timeZone = null
+                )
+            ),
+            selectedAssetIds = setOf(LocalAssetId("a")),
+            stagedEditsByAssetId = mapOf(
+                LocalAssetId("a") to AssetEditPatch(
+                    description = FieldPatch.Set("caption"),
+                    albumId = FieldPatch.Set("album-1"),
+                    addTagIds = setOf("tag-1")
+                )
+            )
+        )
+
+        val plan = ImmichRequestBuilder.buildDryRunPlan(state)
+        val requests = ImmichRequestBuilder.buildPayloadInspectorRequests(plan)
+
+        assertTrue(requests.any { it.method == "POST" && it.url == "$IMMICH_API_BASE_URL/assets" })
+        assertTrue(requests.any { it.method == "PUT" && it.url == "$IMMICH_API_BASE_URL/assets/updateAssets" })
+        assertTrue(requests.any { it.method == "PUT" && it.url == "$IMMICH_API_BASE_URL/tags/assets" })
+        assertTrue(requests.any { it.method == "PUT" && it.url == "$IMMICH_API_BASE_URL/albums/assets" })
+        assertTrue(requests.any { it.body?.contains("\"assetData\":\"<binary:") == true })
+        assertTrue(requests.any { it.body?.contains("\"description\":\"caption\"") == true })
+    }
 }

@@ -28,7 +28,10 @@ data class UploadPrepState(
     val availableAlbums: List<ImmichCatalogEntry> = emptyList(),
     val availableTags: List<ImmichCatalogEntry> = emptyList(),
     val catalogStatus: CatalogUiStatus = CatalogUiStatus.Idle,
-    val catalogMessage: String? = null
+    val catalogMessage: String? = null,
+    val dryRunPlan: ImmichRequestPlan? = null,
+    val dryRunApiRequests: List<ImmichApiRequest> = emptyList(),
+    val dryRunMessage: String? = null
 )
 
 enum class CatalogUiStatus {
@@ -58,6 +61,12 @@ sealed interface UploadPrepAction {
     data class CatalogTagsLoaded(val tags: List<ImmichCatalogEntry>, val message: String) : UploadPrepAction
     data class CatalogBlockedMissingApiKey(val message: String) : UploadPrepAction
     data object ClearCatalogMessage : UploadPrepAction
+    data class DryRunPreviewGenerated(
+        val plan: ImmichRequestPlan,
+        val requests: List<ImmichApiRequest>,
+        val message: String
+    ) : UploadPrepAction
+    data object ClearDryRunPreview : UploadPrepAction
 }
 
 fun reduceUploadPrepState(state: UploadPrepState, action: UploadPrepAction): UploadPrepState =
@@ -139,6 +148,18 @@ fun reduceUploadPrepState(state: UploadPrepState, action: UploadPrepAction): Upl
         )
 
         UploadPrepAction.ClearCatalogMessage -> state.copy(catalogMessage = null)
+
+        is UploadPrepAction.DryRunPreviewGenerated -> state.copy(
+            dryRunPlan = action.plan,
+            dryRunApiRequests = action.requests,
+            dryRunMessage = action.message
+        )
+
+        UploadPrepAction.ClearDryRunPreview -> state.copy(
+            dryRunPlan = null,
+            dryRunApiRequests = emptyList(),
+            dryRunMessage = null
+        )
     }
 
 private fun stagePatchForIds(

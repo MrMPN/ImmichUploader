@@ -98,6 +98,7 @@ data class ImmichRequestPlan(
 
 object ImmichRequestBuilder {
     private const val FALLBACK_TIMESTAMP = "1970-01-01T00:00:00Z"
+    private const val DEFAULT_DEVICE_ID = "web-local-device"
 
     fun buildUploadRequest(asset: LocalAsset, deviceId: String): ImmichUploadRequest {
         val timestamp = asset.captureDateTime ?: FALLBACK_TIMESTAMP
@@ -169,4 +170,118 @@ object ImmichRequestBuilder {
         }
         return hooks
     }
+
+    fun buildDryRunPlan(
+        state: UploadPrepState,
+        deviceId: String = DEFAULT_DEVICE_ID
+    ): ImmichRequestPlan {
+        val selectedIds = state.selectedAssetIds.toList().sortedBy { it.value }
+        val selectedAssets = selectedIds.mapNotNull { state.assets[it] }
+
+        val uploadRequests = selectedAssets.map { asset ->
+            buildUploadRequest(asset, deviceId)
+        }
+
+        val remoteIdsByPatch = linkedMapOf<AssetEditPatch, MutableSet<String>>()
+        selectedIds.forEach { assetId ->
+            val patch = state.stagedEditsByAssetId[assetId] ?: return@forEach
+            val remoteIds = remoteIdsByPatch.getOrPut(patch) { linkedSetOf() }
+            remoteIds += "remote-${assetId.value}"
+        }
+
+        val bulkMetadataRequests = mutableListOf<ImmichBulkMetadataRequest>()
+        val tagAssignRequests = mutableListOf<ImmichTagAssignRequest>()
+        val albumAddRequests = mutableListOf<ImmichAlbumAddRequest>()
+
+        remoteIdsByPatch.forEach { (patch, remoteIds) ->
+            buildBulkMetadataRequest(remoteIds, patch)?.let { bulkMetadataRequests += it }
+            buildTagAssignRequest(remoteIds, patch)?.let { tagAssignRequests += it }
+            buildAlbumAddRequest(remoteIds, patch)?.let { albumAddRequests += it }
+        }
+
+        val lookupHooks = buildLookupHooks(
+            shouldLookupAlbums = state.availableAlbums.isEmpty(),
+            shouldLookupTags = state.availableTags.isEmpty(),
+            albumsToCreate = setOf(state.albumCreateDraft),
+            tagsToCreate = setOf(state.tagCreateDraft)
+        )
+
+        return ImmichRequestPlan(
+            uploadRequests = uploadRequests,
+            bulkMetadataRequests = bulkMetadataRequests,
+            tagAssignRequests = tagAssignRequests,
+            albumAddRequests = albumAddRequests,
+            lookupHooks = lookupHooks
+        )
+    }
+
+    fun buildPayloadInspectorRequests(plan: ImmichRequestPlan): List<ImmichApiRequest> {
+        val requests = mutableListOf<ImmichApiRequest>()
+
+        plan.lookupHooks.forEach { hook ->
+            requests += when (hook) {
+                ImmichLookupHook.LookupAlbums -> ImmichCatalogRequestBuilder.lookupAlbums()
+                ImmichLookupHook.LookupTags -> ImmichCatalogRequestBuilder.lookupTags()
+                is ImmichLookupHook.CreateAlbumIfMissing -> ImmichCatalogRequestBuilder.createAlbum(hook.name)
+                is ImmichLookupHook.CreateTagIfMissing -> ImmichCatalogRequestBuilder.createTag(hook.name)
+            }
+        }
+
+        plan.uploadRequests.forEach { request ->
+            requests += ImmichApiRequest(
+                method = "POST",
+                url = "$IMMICH_API_BASE_URL/assets",
+                body = request.toPayloadJson()
+            )
+        }
+
+        plan.bulkMetadataRequests.forEach { request ->
+            requests += ImmichApiRequest(
+                method = "PUT",
+                url = "$IMMICH_API_BASE_URL/assets/updateAssets",
+                body = request.toPayloadJson()
+            )
+        }
+
+        plan.tagAssignRequests.forEach { request ->
+            requests += ImmichApiRequest(
+                method = "PUT",
+                url = "$IMMICH_API_BASE_URL/tags/assets",
+                body = request.toPayloadJson()
+            )
+        }
+
+        plan.albumAddRequests.forEach { request ->
+            requests += ImmichApiRequest(
+                method = "PUT",
+                url = "$IMMICH_API_BASE_URL/albums/assets",
+                body = request.toPayloadJson()
+            )
+        }
+
+        return requests
+    }
 }
+
+private fun ImmichUploadRequest.toPayloadJson(): String {
+    val metadataJson = metadata.entries
+        .sortedBy { it.key }
+        .joinToString(",") { (key, value) -> """"${key.escapeJson()}":"${value.escapeJson()}"""" }
+    return """{"assetData":"<binary:$localAssetId>","deviceAssetId":"${deviceAssetId.escapeJson()}","deviceId":"${deviceId.escapeJson()}","fileCreatedAt":"${fileCreatedAt.escapeJson()}","fileModifiedAt":"${fileModifiedAt.escapeJson()}","metadata":{$metadataJson}}"""
+}
+
+private fun ImmichBulkMetadataRequest.toPayloadJson(): String {
+    val fields = mutableListOf<String>()
+    fields += """"ids":[${ids.sorted().joinToString(",") { """"${it.escapeJson()}"""" }}]"""
+    dateTimeOriginal?.let { fields += """"dateTimeOriginal":"${it.escapeJson()}"""" }
+    timeZone?.let { fields += """"timeZone":"${it.escapeJson()}"""" }
+    description?.let { fields += """"description":"${it.escapeJson()}"""" }
+    isFavorite?.let { fields += """"isFavorite":$it""" }
+    return "{${fields.joinToString(",")}}"
+}
+
+private fun ImmichTagAssignRequest.toPayloadJson(): String =
+    """{"assetIds":[${assetIds.sorted().joinToString(",") { """"${it.escapeJson()}"""" }}],"tagIds":[${tagIds.sorted().joinToString(",") { """"${it.escapeJson()}"""" }}]}"""
+
+private fun ImmichAlbumAddRequest.toPayloadJson(): String =
+    """{"albumId":"${albumId.escapeJson()}","assetIds":[${assetIds.sorted().joinToString(",") { """"${it.escapeJson()}"""" }}]}"""
