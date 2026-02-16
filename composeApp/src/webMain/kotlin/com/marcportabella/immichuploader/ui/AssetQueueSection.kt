@@ -1,17 +1,18 @@
 package com.marcportabella.immichuploader.ui
 
-import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
@@ -24,6 +25,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.marcportabella.immichuploader.domain.AssetEditPatch
 import com.marcportabella.immichuploader.domain.FieldPatch
@@ -36,47 +38,45 @@ fun LazyListScope.assetQueueSection(
     state: UploadPrepState,
     sortedAssets: List<LocalAsset>,
     thumbnailCache: MutableMap<LocalAssetId, ImageBitmap?>,
+    columns: Int,
     onToggleSelection: (LocalAssetId) -> Unit
 ) {
-    item(key = "asset-queue-header") {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .animateContentSize(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    "Asset queue",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-                if (sortedAssets.isEmpty()) {
-                    Text("No files selected yet.")
-                } else {
-                    Text("Sorted by filename for predictable review.")
-                }
-            }
+    if (sortedAssets.isEmpty()) {
+        item(key = "asset-queue-empty") {
+            Text(
+                text = "No files selected yet.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
+        return
     }
 
-    if (sortedAssets.isNotEmpty()) {
-        items(
-            items = sortedAssets,
-            key = { it.id.value }
-        ) { asset ->
-            val patch = state.stagedEditsByAssetId[asset.id]
-            val metadata = asset.toDisplayMetadata(patch)
-            AssetQueueRow(
-                asset = asset,
-                metadata = metadata,
-                isSelected = asset.id in state.selectedAssetIds,
-                thumbnailCache = thumbnailCache,
-                onToggleSelection = onToggleSelection
-            )
+    val columnCount = columns.coerceAtLeast(1)
+    val rows = sortedAssets.chunked(columnCount)
+    itemsIndexed(
+        items = rows,
+        key = { index, row -> "asset-row-${index}-${row.first().id.value}" }
+    ) { _, rowAssets ->
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            rowAssets.forEach { asset ->
+                val patch = state.stagedEditsByAssetId[asset.id]
+                val metadata = asset.toDisplayMetadata(patch)
+                AssetQueueTile(
+                    asset = asset,
+                    metadata = metadata,
+                    isSelected = asset.id in state.selectedAssetIds,
+                    thumbnailCache = thumbnailCache,
+                    onToggleSelection = onToggleSelection,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            repeat(columnCount - rowAssets.size) {
+                Spacer(modifier = Modifier.weight(1f))
+            }
         }
     }
 }
@@ -84,64 +84,76 @@ fun LazyListScope.assetQueueSection(
 private const val ENABLE_QUEUE_PREVIEWS = true
 
 @Composable
-private fun AssetQueueRow(
+private fun AssetQueueTile(
     asset: LocalAsset,
     metadata: DisplayMetadata,
     isSelected: Boolean,
     thumbnailCache: MutableMap<LocalAssetId, ImageBitmap?>,
-    onToggleSelection: (LocalAssetId) -> Unit
+    onToggleSelection: (LocalAssetId) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.clickable { onToggleSelection(asset.id) },
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
+            containerColor = if (isSelected) {
+                MaterialTheme.colorScheme.secondaryContainer
+            } else {
+                MaterialTheme.colorScheme.surfaceVariant
+            }
         )
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(10.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        Column(
+            modifier = Modifier.padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Checkbox(
-                checked = isSelected,
-                onCheckedChange = { onToggleSelection(asset.id) }
-            )
-            Column(
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    if (ENABLE_QUEUE_PREVIEWS) {
-                        AssetPreviewThumbnail(
-                            asset = asset,
-                            thumbnailCache = thumbnailCache
-                        )
-                    } else {
-                        PreviewDisabledPlaceholder(asset.mimeType)
-                    }
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(2.dp)
-                    ) {
-                        Text(asset.fileName, fontWeight = FontWeight.Medium)
-                        Text("${asset.mimeType} · ${asset.fileSizeBytes} bytes")
-                        Text("Date/time: ${metadata.dateTimeOriginal ?: "Unknown"}")
-                        Text("Timezone: ${metadata.timeZone ?: "Unknown"} (read-only)")
-                        Text("Camera: ${metadata.cameraLabel ?: "Unknown"}")
-                        Text("Description: ${metadata.description ?: "None"}")
-                        Text("Favorite: ${metadata.isFavorite?.toString() ?: "None"}")
-                        Text("Album: ${metadata.albumId ?: "None"}")
-                        Text("Tags: ${if (metadata.tagIds.isEmpty()) "None" else metadata.tagIds.joinToString(", ")}")
-                        if (metadata.exifSummary != null) {
-                            Text("EXIF: ${metadata.exifSummary}")
-                        }
-                    }
-                }
+                Text(
+                    text = asset.fileName,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                Checkbox(
+                    checked = isSelected,
+                    onCheckedChange = { onToggleSelection(asset.id) }
+                )
             }
+
+            if (ENABLE_QUEUE_PREVIEWS) {
+                AssetPreviewThumbnail(
+                    asset = asset,
+                    thumbnailCache = thumbnailCache,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(1.4f)
+                )
+            } else {
+                PreviewDisabledPlaceholder(
+                    mimeType = asset.mimeType,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(1.4f)
+                )
+            }
+
+            Text(
+                text = metadata.dateTimeOriginal ?: "Unknown date",
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = metadata.timeZone ?: "Unknown timezone",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }
@@ -149,7 +161,8 @@ private fun AssetQueueRow(
 @Composable
 private fun AssetPreviewThumbnail(
     asset: LocalAsset,
-    thumbnailCache: MutableMap<LocalAssetId, ImageBitmap?>
+    thumbnailCache: MutableMap<LocalAssetId, ImageBitmap?>,
+    modifier: Modifier = Modifier
 ) {
     val imageBitmap = thumbnailCache.getOrPut(asset.id) {
         val bytes = asset.previewBytes ?: return@getOrPut null
@@ -161,9 +174,7 @@ private fun AssetPreviewThumbnail(
             bitmap = imageBitmap,
             contentDescription = "${asset.fileName} preview",
             contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .size(92.dp)
-                .aspectRatio(1f)
+            modifier = modifier
                 .clip(MaterialTheme.shapes.small)
                 .background(MaterialTheme.colorScheme.surface)
         )
@@ -172,15 +183,14 @@ private fun AssetPreviewThumbnail(
 
     val fallback = when {
         asset.previewUrl == null -> "No preview"
-        asset.mimeType.startsWith("video/") -> "Video\npreview\nn/a"
-        else -> "Preview\nunavailable"
+        asset.mimeType.startsWith("video/") -> "Video preview n/a"
+        else -> "Preview unavailable"
     }
 
     Text(
         text = fallback,
         style = MaterialTheme.typography.labelSmall,
-        modifier = Modifier
-            .size(92.dp)
+        modifier = modifier
             .clip(MaterialTheme.shapes.small)
             .background(MaterialTheme.colorScheme.surface)
             .padding(8.dp)
@@ -188,7 +198,10 @@ private fun AssetPreviewThumbnail(
 }
 
 @Composable
-private fun PreviewDisabledPlaceholder(mimeType: String) {
+private fun PreviewDisabledPlaceholder(
+    mimeType: String,
+    modifier: Modifier = Modifier
+) {
     val label = when {
         mimeType.startsWith("image/") -> "Image preview disabled"
         mimeType.startsWith("video/") -> "Video preview disabled"
@@ -197,8 +210,7 @@ private fun PreviewDisabledPlaceholder(mimeType: String) {
     Text(
         text = label,
         style = MaterialTheme.typography.labelSmall,
-        modifier = Modifier
-            .size(92.dp)
+        modifier = modifier
             .clip(MaterialTheme.shapes.small)
             .background(MaterialTheme.colorScheme.surface)
             .padding(8.dp)

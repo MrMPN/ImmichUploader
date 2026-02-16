@@ -199,6 +199,7 @@ fun UploadPrepScreen(store: UploadPrepStore) {
                     state = state,
                     sortedAssets = sortedAssets,
                     thumbnailCache = thumbnailCache,
+                    columns = 4,
                     onToggleSelection = { store.dispatch(UploadPrepAction.ToggleSelection(it)) }
                 )
 
@@ -345,6 +346,7 @@ fun UploadPrepScreen(store: UploadPrepStore) {
                         state = state,
                         sortedAssets = sortedAssets,
                         thumbnailCache = thumbnailCache,
+                        columns = 5,
                         onToggleSelection = { store.dispatch(UploadPrepAction.ToggleSelection(it)) }
                     )
                 }
