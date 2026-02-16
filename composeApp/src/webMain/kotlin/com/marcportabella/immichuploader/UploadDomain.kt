@@ -12,7 +12,11 @@ data class LocalAsset(
     val fileSizeBytes: Long,
     val previewUrl: String?,
     val captureDateTime: String?,
-    val timeZone: String?
+    val timeZone: String?,
+    val description: String? = null,
+    val isFavorite: Boolean? = null,
+    val albumId: String? = null,
+    val tagIds: Set<String> = emptySet()
 )
 
 sealed interface FieldPatch<out T> {

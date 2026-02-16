@@ -11,7 +11,9 @@ import androidx.compose.foundation.layout.safeContentPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -95,35 +97,204 @@ fun App() {
             Text("Bulk metadata request ready: ${stagedBulkRequest != null}")
             Text("Transport gate: $gateStatus")
 
-            Button(
-                modifier = Modifier.padding(top = 8.dp),
-                onClick = {
-                    val input = document.getElementById("local-file-input") as? HTMLInputElement
-                    input?.click()
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    modifier = Modifier.padding(top = 8.dp),
+                    onClick = {
+                        val input = document.getElementById("local-file-input") as? HTMLInputElement
+                        input?.click()
+                    }
+                ) {
+                    Text("Select local media")
                 }
-            ) {
-                Text("Select local media")
+
+                Button(
+                    modifier = Modifier.padding(top = 8.dp),
+                    onClick = { store.dispatch(UploadPrepAction.SelectAll) },
+                    enabled = state.assets.isNotEmpty()
+                ) {
+                    Text("Select all")
+                }
+
+                Button(
+                    modifier = Modifier.padding(top = 8.dp),
+                    onClick = { store.dispatch(UploadPrepAction.ClearSelection) },
+                    enabled = state.selectedAssetIds.isNotEmpty()
+                ) {
+                    Text("Clear selection")
+                }
             }
+
+            BulkEditSection(
+                draft = state.bulkEditDraft,
+                selectedCount = state.selectedAssetIds.size,
+                onDraftChange = { store.dispatch(UploadPrepAction.SetBulkEditDraft(it)) },
+                onApply = { store.dispatch(UploadPrepAction.ApplyBulkEditDraftToSelected) },
+                onClearDraft = { store.dispatch(UploadPrepAction.ClearBulkEditDraft) },
+                onClearSelectedStaged = { store.dispatch(UploadPrepAction.ClearStagedForSelected) }
+            )
 
             if (state.assets.isEmpty()) {
                 Text("No files selected yet.")
             } else {
                 Text("Queue")
                 state.assets.values.sortedBy { it.fileName }.forEach { asset ->
+                    val patch = state.stagedEditsByAssetId[asset.id]
+                    val metadata = asset.toDisplayMetadata(patch)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
+                        Checkbox(
+                            checked = asset.id in state.selectedAssetIds,
+                            onCheckedChange = { store.dispatch(UploadPrepAction.ToggleSelection(asset.id)) }
+                        )
+                        Column(modifier = Modifier.fillMaxWidth()) {
                             Text(asset.fileName)
                             Text("${asset.mimeType} · ${asset.fileSizeBytes} bytes")
+                            Text("Date/time: ${metadata.dateTimeOriginal ?: "Unknown"}")
+                            Text("Timezone: ${metadata.timeZone ?: "Unknown"} (read-only)")
+                            Text("Description: ${metadata.description ?: "None"}")
+                            Text("Favorite: ${metadata.isFavorite?.toString() ?: "None"}")
+                            Text("Album: ${metadata.albumId ?: "None"}")
+                            Text("Tags: ${if (metadata.tagIds.isEmpty()) "None" else metadata.tagIds.joinToString(", ")}")
+                            Text(if (asset.previewUrl == null) "No preview" else "Preview ready")
                         }
-                        Text(if (asset.previewUrl == null) "No preview" else "Preview ready")
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun BulkEditSection(
+    draft: BulkEditDraft,
+    selectedCount: Int,
+    onDraftChange: (BulkEditDraft) -> Unit,
+    onApply: () -> Unit,
+    onClearDraft: () -> Unit,
+    onClearSelectedStaged: () -> Unit
+) {
+    Text("Bulk edit selected assets")
+    Text("Selected subset: $selectedCount")
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Checkbox(
+            checked = draft.includeDescription,
+            onCheckedChange = { onDraftChange(draft.copy(includeDescription = it)) }
+        )
+        OutlinedTextField(
+            value = draft.description,
+            onValueChange = { onDraftChange(draft.copy(description = it)) },
+            label = { Text("Description") },
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Checkbox(
+            checked = draft.includeDateTimeOriginal,
+            onCheckedChange = { onDraftChange(draft.copy(includeDateTimeOriginal = it)) }
+        )
+        OutlinedTextField(
+            value = draft.dateTimeOriginal,
+            onValueChange = { onDraftChange(draft.copy(dateTimeOriginal = it)) },
+            label = { Text("Date/time original (ISO 8601)") },
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Checkbox(
+            checked = draft.includeAlbumId,
+            onCheckedChange = { onDraftChange(draft.copy(includeAlbumId = it)) }
+        )
+        OutlinedTextField(
+            value = draft.albumId,
+            onValueChange = { onDraftChange(draft.copy(albumId = it)) },
+            label = { Text("Album ID") },
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Checkbox(
+            checked = draft.includeFavorite,
+            onCheckedChange = { onDraftChange(draft.copy(includeFavorite = it)) }
+        )
+        Button(onClick = { onDraftChange(draft.copy(isFavorite = !draft.isFavorite)) }) {
+            Text("Favorite = ${draft.isFavorite}")
+        }
+    }
+
+    OutlinedTextField(
+        value = draft.addTagIds,
+        onValueChange = { onDraftChange(draft.copy(addTagIds = it)) },
+        label = { Text("Add tag IDs (comma separated)") },
+        modifier = Modifier.fillMaxWidth()
+    )
+
+    OutlinedTextField(
+        value = draft.removeTagIds,
+        onValueChange = { onDraftChange(draft.copy(removeTagIds = it)) },
+        label = { Text("Remove tag IDs (comma separated)") },
+        modifier = Modifier.fillMaxWidth()
+    )
+
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button(onClick = onApply, enabled = selectedCount > 0) {
+            Text("Apply to selected")
+        }
+        Button(onClick = onClearDraft) {
+            Text("Reset bulk draft")
+        }
+        Button(onClick = onClearSelectedStaged, enabled = selectedCount > 0) {
+            Text("Clear selected staged")
+        }
+    }
+
+    Text("Timezone is shown per asset as read-only metadata.")
+}
+
+data class DisplayMetadata(
+    val dateTimeOriginal: String?,
+    val timeZone: String?,
+    val description: String?,
+    val isFavorite: Boolean?,
+    val albumId: String?,
+    val tagIds: Set<String>
+)
+
+private fun LocalAsset.toDisplayMetadata(patch: AssetEditPatch?): DisplayMetadata {
+    val description = (patch?.description as? FieldPatch.Set<String?>)?.value ?: description
+    val isFavorite = (patch?.isFavorite as? FieldPatch.Set<Boolean>)?.value ?: isFavorite
+    val dateTimeOriginal = (patch?.dateTimeOriginal as? FieldPatch.Set<String>)?.value ?: captureDateTime
+    val albumId = (patch?.albumId as? FieldPatch.Set<String?>)?.value ?: albumId
+
+    val addTags = patch?.addTagIds ?: emptySet()
+    val removeTags = patch?.removeTagIds ?: emptySet()
+
+    return DisplayMetadata(
+        dateTimeOriginal = dateTimeOriginal,
+        timeZone = timeZone,
+        description = description,
+        isFavorite = isFavorite,
+        albumId = albumId,
+        tagIds = (tagIds + addTags) - removeTags
+    )
 }
 
 private fun File.toLocalIntakeFile(): LocalIntakeFile {

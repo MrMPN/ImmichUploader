@@ -4,20 +4,38 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 
+data class BulkEditDraft(
+    val includeDescription: Boolean = false,
+    val description: String = "",
+    val includeFavorite: Boolean = false,
+    val isFavorite: Boolean = false,
+    val includeDateTimeOriginal: Boolean = false,
+    val dateTimeOriginal: String = "",
+    val includeAlbumId: Boolean = false,
+    val albumId: String = "",
+    val addTagIds: String = "",
+    val removeTagIds: String = ""
+)
+
 data class UploadPrepState(
     val assets: Map<LocalAssetId, LocalAsset> = emptyMap(),
     val selectedAssetIds: Set<LocalAssetId> = emptySet(),
-    val stagedEditsByAssetId: Map<LocalAssetId, AssetEditPatch> = emptyMap()
+    val stagedEditsByAssetId: Map<LocalAssetId, AssetEditPatch> = emptyMap(),
+    val bulkEditDraft: BulkEditDraft = BulkEditDraft()
 )
 
 sealed interface UploadPrepAction {
     data class ReplaceAssets(val assets: List<LocalAsset>) : UploadPrepAction
     data class ToggleSelection(val assetId: LocalAssetId) : UploadPrepAction
     data class SetSelection(val assetIds: Set<LocalAssetId>) : UploadPrepAction
+    data object SelectAll : UploadPrepAction
     data object ClearSelection : UploadPrepAction
     data class StageEditForSelected(val patch: AssetEditPatch) : UploadPrepAction
     data class StageEditForAsset(val assetId: LocalAssetId, val patch: AssetEditPatch) : UploadPrepAction
     data object ClearStagedForSelected : UploadPrepAction
+    data class SetBulkEditDraft(val draft: BulkEditDraft) : UploadPrepAction
+    data object ApplyBulkEditDraftToSelected : UploadPrepAction
+    data object ClearBulkEditDraft : UploadPrepAction
 }
 
 fun reduceUploadPrepState(state: UploadPrepState, action: UploadPrepAction): UploadPrepState =
@@ -45,6 +63,8 @@ fun reduceUploadPrepState(state: UploadPrepState, action: UploadPrepAction): Upl
             selectedAssetIds = action.assetIds.intersect(state.assets.keys)
         )
 
+        UploadPrepAction.SelectAll -> state.copy(selectedAssetIds = state.assets.keys)
+
         UploadPrepAction.ClearSelection -> state.copy(selectedAssetIds = emptySet())
 
         is UploadPrepAction.StageEditForSelected ->
@@ -58,6 +78,15 @@ fun reduceUploadPrepState(state: UploadPrepState, action: UploadPrepAction): Upl
         UploadPrepAction.ClearStagedForSelected -> state.copy(
             stagedEditsByAssetId = state.stagedEditsByAssetId.filterKeys { it !in state.selectedAssetIds }
         )
+
+        is UploadPrepAction.SetBulkEditDraft -> state.copy(bulkEditDraft = action.draft)
+
+        UploadPrepAction.ApplyBulkEditDraftToSelected -> {
+            val patch = state.bulkEditDraft.toPatch() ?: return state
+            stagePatchForIds(state, state.selectedAssetIds, patch)
+        }
+
+        UploadPrepAction.ClearBulkEditDraft -> state.copy(bulkEditDraft = BulkEditDraft())
     }
 
 private fun stagePatchForIds(
@@ -75,6 +104,40 @@ private fun stagePatchForIds(
 
     return state.copy(stagedEditsByAssetId = nextStaged)
 }
+
+private fun BulkEditDraft.toPatch(): AssetEditPatch? {
+    val addTags = parseTagList(addTagIds)
+    val removeTags = parseTagList(removeTagIds)
+
+    val patch = AssetEditPatch(
+        description = if (includeDescription) FieldPatch.Set(description.ifBlank { null }) else FieldPatch.Unset,
+        isFavorite = if (includeFavorite) FieldPatch.Set(isFavorite) else FieldPatch.Unset,
+        dateTimeOriginal = if (includeDateTimeOriginal && dateTimeOriginal.isNotBlank()) {
+            FieldPatch.Set(dateTimeOriginal)
+        } else {
+            FieldPatch.Unset
+        },
+        albumId = if (includeAlbumId) FieldPatch.Set(albumId.ifBlank { null }) else FieldPatch.Unset,
+        addTagIds = addTags,
+        removeTagIds = removeTags
+    )
+
+    return if (
+        patch.description is FieldPatch.Unset &&
+        patch.isFavorite is FieldPatch.Unset &&
+        patch.dateTimeOriginal is FieldPatch.Unset &&
+        patch.albumId is FieldPatch.Unset &&
+        patch.addTagIds.isEmpty() &&
+        patch.removeTagIds.isEmpty()
+    ) {
+        null
+    } else {
+        patch
+    }
+}
+
+private fun parseTagList(value: String): Set<String> =
+    value.split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
 
 class UploadPrepStore(initialState: UploadPrepState = UploadPrepState()) {
     var state by mutableStateOf(initialState)

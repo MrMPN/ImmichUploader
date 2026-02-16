@@ -54,6 +54,65 @@ class ComposeAppWebTest {
     }
 
     @Test
+    fun selectAllSelectsLoadedAssetsOnly() {
+        val a = LocalAssetId("a")
+        val b = LocalAssetId("b")
+        val initial = UploadPrepState(
+            assets = mapOf(
+                a to LocalAsset(a, "a.jpg", "image/jpeg", 1, null, null, null),
+                b to LocalAsset(b, "b.jpg", "image/jpeg", 2, null, null, null)
+            ),
+            selectedAssetIds = setOf(a)
+        )
+
+        val next = reduceUploadPrepState(initial, UploadPrepAction.SelectAll)
+
+        assertEquals(setOf(a, b), next.selectedAssetIds)
+    }
+
+    @Test
+    fun applyBulkDraftStagesOnlyEditedFieldsForSelectedSubset() {
+        val a = LocalAssetId("a")
+        val b = LocalAssetId("b")
+        val c = LocalAssetId("c")
+
+        val initial = UploadPrepState(
+            assets = mapOf(
+                a to LocalAsset(a, "a.jpg", "image/jpeg", 1, null, null, null),
+                b to LocalAsset(b, "b.jpg", "image/jpeg", 2, null, null, null),
+                c to LocalAsset(c, "c.jpg", "image/jpeg", 3, null, null, null)
+            ),
+            selectedAssetIds = setOf(a, c),
+            stagedEditsByAssetId = mapOf(
+                a to AssetEditPatch(description = FieldPatch.Set("keep-me"))
+            ),
+            bulkEditDraft = BulkEditDraft(
+                includeFavorite = true,
+                isFavorite = true,
+                addTagIds = "tag-a, tag-b"
+            )
+        )
+
+        val next = reduceUploadPrepState(initial, UploadPrepAction.ApplyBulkEditDraftToSelected)
+
+        assertEquals(setOf(a, c), next.stagedEditsByAssetId.keys)
+
+        val patchA = next.stagedEditsByAssetId[a]
+        assertNotNull(patchA)
+        assertEquals("keep-me", (patchA.description as FieldPatch.Set<String?>).value)
+        assertEquals(true, (patchA.isFavorite as FieldPatch.Set<Boolean>).value)
+        assertEquals(setOf("tag-a", "tag-b"), patchA.addTagIds)
+
+        val patchC = next.stagedEditsByAssetId[c]
+        assertNotNull(patchC)
+        assertTrue(patchC.description is FieldPatch.Unset)
+        assertEquals(true, (patchC.isFavorite as FieldPatch.Set<Boolean>).value)
+        assertEquals(setOf("tag-a", "tag-b"), patchC.addTagIds)
+
+        assertNull(next.stagedEditsByAssetId[b])
+    }
+
+    @Test
     fun bulkMetadataBuilderCreatesRequestWhenPatchContainsMetadataFields() {
         val request = ImmichRequestBuilder.buildBulkMetadataRequest(
             assetIds = setOf("2", "1"),
