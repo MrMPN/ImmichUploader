@@ -2,6 +2,7 @@ package com.marcportabella.immichuploader.data
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
+import com.marcportabella.immichuploader.web.logError
 
 class ApiImmichOnlineCatalogTransport(
     private val executor: ImmichApiExecutor = BrowserImmichApiExecutor()
@@ -89,7 +90,7 @@ class ApiImmichOnlineCatalogTransport(
             .fold(
                 onSuccess = { ExecutionAttempt(result = it, errorMessage = null) },
                 onFailure = { throwable ->
-                    catalogConsole.error(
+                    logError(
                         "[immichuploader][catalog] request failed: ${request.method} ${request.url} error=${throwable.message ?: throwable}"
                     )
                     ExecutionAttempt(
@@ -102,7 +103,7 @@ class ApiImmichOnlineCatalogTransport(
     private fun parseAlbumEntries(responseBody: String): List<ImmichCatalogEntry> =
         runCatching { immichJson.decodeFromString<List<ImmichAlbumResponse>>(responseBody) }
             .onFailure { throwable ->
-                catalogConsole.error("[immichuploader][catalog] album decode failed: ${throwable.message ?: throwable}")
+                logError("[immichuploader][catalog] album decode failed: ${throwable.message ?: throwable}")
             }
             .getOrDefault(emptyList())
             .mapNotNull { album ->
@@ -115,7 +116,7 @@ class ApiImmichOnlineCatalogTransport(
     private fun parseTagEntries(responseBody: String): List<ImmichCatalogEntry> =
         runCatching { immichJson.decodeFromString<List<ImmichTagResponse>>(responseBody) }
             .onFailure { throwable ->
-                catalogConsole.error("[immichuploader][catalog] tag decode failed: ${throwable.message ?: throwable}")
+                logError("[immichuploader][catalog] tag decode failed: ${throwable.message ?: throwable}")
             }
             .getOrDefault(emptyList())
             .mapNotNull { tag ->
@@ -144,7 +145,3 @@ private data class ImmichTagResponse(
     val name: String? = null,
     val value: String? = null
 )
-
-private external object catalogConsole {
-    fun error(message: String)
-}
