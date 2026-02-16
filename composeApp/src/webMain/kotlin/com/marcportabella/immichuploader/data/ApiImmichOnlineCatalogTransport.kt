@@ -13,7 +13,8 @@ class ApiImmichOnlineCatalogTransport(
 
     override suspend fun lookupAlbums(apiKey: String): ImmichCatalogResult.Success {
         val request = ImmichCatalogRequestBuilder.lookupAlbums()
-        val result = execute(request, apiKey)
+        val execution = execute(request, apiKey)
+        val result = execution.result
         val entries = if (result != null && result.statusCode in 200..299) {
             parseEntries(result.responseBody, nameKeys = listOf("albumName", "name"))
         } else {
@@ -21,7 +22,7 @@ class ApiImmichOnlineCatalogTransport(
         }
 
         val message = when {
-            result == null -> "Album lookup failed before response."
+            result == null -> "Album lookup failed before response: ${execution.errorMessage ?: "unknown network error"}"
             result.statusCode !in 200..299 -> "Album lookup failed with HTTP ${result.statusCode}."
             else -> "Loaded ${entries.size} albums from server."
         }
@@ -31,7 +32,8 @@ class ApiImmichOnlineCatalogTransport(
 
     override suspend fun lookupTags(apiKey: String): ImmichCatalogResult.Success {
         val request = ImmichCatalogRequestBuilder.lookupTags()
-        val result = execute(request, apiKey)
+        val execution = execute(request, apiKey)
+        val result = execution.result
         val entries = if (result != null && result.statusCode in 200..299) {
             parseEntries(result.responseBody, nameKeys = listOf("value", "name"))
         } else {
@@ -39,7 +41,7 @@ class ApiImmichOnlineCatalogTransport(
         }
 
         val message = when {
-            result == null -> "Tag lookup failed before response."
+            result == null -> "Tag lookup failed before response: ${execution.errorMessage ?: "unknown network error"}"
             result.statusCode !in 200..299 -> "Tag lookup failed with HTTP ${result.statusCode}."
             else -> "Loaded ${entries.size} tags from server."
         }
@@ -49,14 +51,12 @@ class ApiImmichOnlineCatalogTransport(
 
     override suspend fun createAlbumIfMissing(apiKey: String, name: String): ImmichCatalogResult.Success {
         val request = ImmichCatalogRequestBuilder.createAlbum(name)
-        val createResult = execute(request, apiKey)
-        if (createResult == null) {
-            return ImmichCatalogResult.Success(
-                request = request,
-                entries = emptyList(),
-                message = "Album create failed before response."
-            )
-        }
+        val createExecution = execute(request, apiKey)
+        val createResult = createExecution.result ?: return ImmichCatalogResult.Success(
+            request = request,
+            entries = emptyList(),
+            message = "Album create failed before response: ${createExecution.errorMessage ?: "unknown network error"}"
+        )
         return if (createResult.statusCode in 200..299 || createResult.statusCode == 409) {
             val refreshed = lookupAlbums(apiKey)
             refreshed.copy(message = "Album ensure requested for \"$name\". ${refreshed.message}")
@@ -71,14 +71,12 @@ class ApiImmichOnlineCatalogTransport(
 
     override suspend fun createTagIfMissing(apiKey: String, name: String): ImmichCatalogResult.Success {
         val request = ImmichCatalogRequestBuilder.createTag(name)
-        val createResult = execute(request, apiKey)
-        if (createResult == null) {
-            return ImmichCatalogResult.Success(
-                request = request,
-                entries = emptyList(),
-                message = "Tag create failed before response."
-            )
-        }
+        val createExecution = execute(request, apiKey)
+        val createResult = createExecution.result ?: return ImmichCatalogResult.Success(
+            request = request,
+            entries = emptyList(),
+            message = "Tag create failed before response: ${createExecution.errorMessage ?: "unknown network error"}"
+        )
         return if (createResult.statusCode in 200..299 || createResult.statusCode == 409) {
             val refreshed = lookupTags(apiKey)
             refreshed.copy(message = "Tag ensure requested for \"$name\". ${refreshed.message}")
@@ -91,8 +89,17 @@ class ApiImmichOnlineCatalogTransport(
         }
     }
 
-    private suspend fun execute(request: ImmichApiRequest, apiKey: String): ImmichApiExecutorResult? =
-        runCatching { executor.execute(request = request, apiKey = apiKey) }.getOrNull()
+    private suspend fun execute(request: ImmichApiRequest, apiKey: String): ExecutionAttempt =
+        runCatching { executor.execute(request = request, apiKey = apiKey) }
+            .fold(
+                onSuccess = { ExecutionAttempt(result = it, errorMessage = null) },
+                onFailure = { throwable ->
+                    ExecutionAttempt(
+                        result = null,
+                        errorMessage = throwable.message ?: throwable.toString()
+                    )
+                }
+            )
 
     private fun parseEntries(responseBody: String, nameKeys: List<String>): List<ImmichCatalogEntry> {
         val root = runCatching { json.parseToJsonElement(responseBody) }.getOrNull() ?: return emptyList()
@@ -106,3 +113,8 @@ class ApiImmichOnlineCatalogTransport(
         }.distinctBy { it.id }.sortedBy { it.name.lowercase() }
     }
 }
+
+private data class ExecutionAttempt(
+    val result: ImmichApiExecutorResult?,
+    val errorMessage: String?
+)
