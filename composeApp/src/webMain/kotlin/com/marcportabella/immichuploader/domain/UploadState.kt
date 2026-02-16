@@ -7,6 +7,11 @@ import com.marcportabella.immichuploader.data.ImmichApiRequest
 import com.marcportabella.immichuploader.data.ImmichCatalogEntry
 import com.marcportabella.immichuploader.data.ImmichRequestBuilder
 import com.marcportabella.immichuploader.data.ImmichRequestPlan
+import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.UtcOffset
+import kotlinx.datetime.toInstant
 
 data class BulkEditDraft(
     val includeDescription: Boolean = false,
@@ -466,22 +471,8 @@ private fun parseTagList(value: String): Set<String> =
     value.split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
 
 private fun isIsoUtcDateTime(value: String): Boolean {
-    val isoUtcRegex = Regex("""^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$""")
-    if (!isoUtcRegex.matches(value)) return false
-
-    val year = value.substring(0, 4).toIntOrNull() ?: return false
-    val month = value.substring(5, 7).toIntOrNull() ?: return false
-    val day = value.substring(8, 10).toIntOrNull() ?: return false
-    val hour = value.substring(11, 13).toIntOrNull() ?: return false
-    val minute = value.substring(14, 16).toIntOrNull() ?: return false
-    val second = value.substring(17, 19).toIntOrNull() ?: return false
-
-    return year >= 1900 &&
-        month in 1..12 &&
-        day in 1..31 &&
-        hour in 0..23 &&
-        minute in 0..59 &&
-        second in 0..59
+    if (!value.endsWith("Z")) return false
+    return runCatching { Instant.parse(value) }.isSuccess
 }
 
 class UploadPrepStore(initialState: UploadPrepState = UploadPrepState()) {
@@ -824,8 +815,9 @@ private fun normalizeExifDateTime(value: String): String? {
         .matchEntire(trimmed)
         ?: return null
 
-    return "${match.groupValues[1]}-${match.groupValues[2]}-${match.groupValues[3]}T" +
+    val normalized = "${match.groupValues[1]}-${match.groupValues[2]}-${match.groupValues[3]}T" +
         "${match.groupValues[4]}:${match.groupValues[5]}:${match.groupValues[6]}"
+    return runCatching { LocalDateTime.parse(normalized) }.getOrNull()?.toString()
 }
 
 private fun parseExifDateTimeAndOffset(value: String): Pair<String, String?>? {
@@ -836,8 +828,9 @@ private fun parseExifDateTimeAndOffset(value: String): Pair<String, String?>? {
 
     val normalizedDateTime = "${match.groupValues[1]}-${match.groupValues[2]}-${match.groupValues[3]}T" +
         "${match.groupValues[4]}:${match.groupValues[5]}:${match.groupValues[6]}"
+    val parsedDateTime = runCatching { LocalDateTime.parse(normalizedDateTime) }.getOrNull() ?: return null
     val rawOffset = match.groupValues[7].ifBlank { null }
-    return normalizedDateTime to rawOffset?.let(::normalizeTimeZoneOffset)
+    return parsedDateTime.toString() to rawOffset?.let(::normalizeTimeZoneOffset)
 }
 
 private fun normalizeTimeZoneOffsetHours(value: String): String? {
@@ -853,13 +846,15 @@ private fun inferTimeZoneOffsetFromGps(
     gpsDateStamp: String?,
     gpsTimeStamp: String?
 ): String? {
-    val local = parseExifDateTimeAndOffset(dateTimeOriginal ?: return null)?.first ?: return null
-    val localParts = parseDateTimeParts(local) ?: return null
-    val gpsParts = parseGpsUtcDateTime(gpsDateStamp ?: return null, gpsTimeStamp ?: return null) ?: return null
+    val localDateTime = parseExifDateTimeAndOffset(dateTimeOriginal ?: return null)
+        ?.first
+        ?.let { runCatching { LocalDateTime.parse(it) }.getOrNull() }
+        ?: return null
+    val gpsUtcDateTime = parseGpsUtcDateTime(gpsDateStamp ?: return null, gpsTimeStamp ?: return null) ?: return null
 
-    val localMinutes = toApproximateEpochMinutes(localParts)
-    val gpsMinutes = toApproximateEpochMinutes(gpsParts)
-    var diff = localMinutes - gpsMinutes
+    val localEpochMinutes = localDateTime.toInstant(TimeZone.UTC).epochSeconds / 60
+    val gpsEpochMinutes = gpsUtcDateTime.toInstant(TimeZone.UTC).epochSeconds / 60
+    var diff = (localEpochMinutes - gpsEpochMinutes).toInt()
 
     while (diff < -14 * 60) diff += 24 * 60
     while (diff > 14 * 60) diff -= 24 * 60
@@ -872,64 +867,38 @@ private fun inferTimeZoneOffsetFromGps(
     return "$sign$hours:$minutes"
 }
 
-private data class DateTimeParts(
-    val year: Int,
-    val month: Int,
-    val day: Int,
-    val hour: Int,
-    val minute: Int
-)
-
-private fun parseDateTimeParts(value: String): DateTimeParts? {
-    val match = Regex("""^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):\d{2}$""").matchEntire(value) ?: return null
-    return DateTimeParts(
-        year = match.groupValues[1].toIntOrNull() ?: return null,
-        month = match.groupValues[2].toIntOrNull() ?: return null,
-        day = match.groupValues[3].toIntOrNull() ?: return null,
-        hour = match.groupValues[4].toIntOrNull() ?: return null,
-        minute = match.groupValues[5].toIntOrNull() ?: return null
-    )
-}
-
-private fun parseGpsUtcDateTime(dateStamp: String, timeStamp: String): DateTimeParts? {
+private fun parseGpsUtcDateTime(dateStamp: String, timeStamp: String): LocalDateTime? {
     val date = Regex("""^(\d{4})[:\-](\d{2})[:\-](\d{2})$""").matchEntire(dateStamp.trim()) ?: return null
     val parts = timeStamp.split(':')
-    if (parts.size < 2) return null
+    if (parts.size < 3) return null
     val hour = parts[0].substringBefore('/').toIntOrNull() ?: return null
     val minute = parts[1].substringBefore('/').toIntOrNull() ?: return null
-    return DateTimeParts(
-        year = date.groupValues[1].toIntOrNull() ?: return null,
-        month = date.groupValues[2].toIntOrNull() ?: return null,
-        day = date.groupValues[3].toIntOrNull() ?: return null,
-        hour = hour,
-        minute = minute
-    )
+    val second = parts[2].substringBefore('/').toIntOrNull() ?: return null
+    val localDateTime = buildString {
+        append(date.groupValues[1])
+        append('-')
+        append(date.groupValues[2])
+        append('-')
+        append(date.groupValues[3])
+        append('T')
+        append(hour.toString().padStart(2, '0'))
+        append(':')
+        append(minute.toString().padStart(2, '0'))
+        append(':')
+        append(second.toString().padStart(2, '0'))
+    }
+    return runCatching { LocalDateTime.parse(localDateTime) }.getOrNull()
 }
-
-private fun toApproximateEpochMinutes(parts: DateTimeParts): Int {
-    val monthDays = intArrayOf(31, if (isLeapYear(parts.year)) 29 else 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
-    val dayOfYear = monthDays.take(parts.month - 1).sum() + parts.day
-    return (((parts.year * 366) + dayOfYear) * 24 + parts.hour) * 60 + parts.minute
-}
-
-private fun isLeapYear(year: Int): Boolean =
-    (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)
 
 private fun normalizeTimeZoneOffset(value: String): String? {
     val trimmed = value.trim()
     if (trimmed == "Z") return "Z"
-
-    val withColon = Regex("""^([+-])(\d{2}):(\d{2})$""").matchEntire(trimmed)
-    if (withColon != null) {
-        return "${withColon.groupValues[1]}${withColon.groupValues[2]}:${withColon.groupValues[3]}"
-    }
-
-    val compact = Regex("""^([+-])(\d{2})(\d{2})$""").matchEntire(trimmed)
-    if (compact != null) {
-        return "${compact.groupValues[1]}${compact.groupValues[2]}:${compact.groupValues[3]}"
-    }
-
-    return null
+    val normalizedInput = Regex("""^([+-])(\d{2})(\d{2})$""")
+        .matchEntire(trimmed)
+        ?.let { "${it.groupValues[1]}${it.groupValues[2]}:${it.groupValues[3]}" }
+        ?: trimmed
+    val offset = runCatching { UtcOffset.parse(normalizedInput) }.getOrNull() ?: return null
+    return offset.toString()
 }
 
 private class ExifReader(
