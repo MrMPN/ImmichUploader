@@ -25,6 +25,9 @@ node_modules/
 .idea/**/dictionaries
 .idea/**/shelf
 
+#AI
+.ai/
+
 # AWS User-specific
 .idea/**/aws.xml
 
