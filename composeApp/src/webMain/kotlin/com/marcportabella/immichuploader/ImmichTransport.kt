@@ -1,5 +1,13 @@
 package com.marcportabella.immichuploader
 
+import kotlinx.browser.window
+import kotlinx.coroutines.await
+
+enum class UploadExecutionPath {
+    BlockedMissingApiKey,
+    ApiExecution
+}
+
 sealed interface TransportGateStatus {
     data object Ready : TransportGateStatus
     data object MissingApiKey : TransportGateStatus
@@ -27,6 +35,7 @@ sealed interface ImmichTransportResult {
     data class DryRun(val plan: ImmichRequestPlan) : ImmichTransportResult
     data class BlockedMissingApiKey(val plan: ImmichRequestPlan) : ImmichTransportResult
     data class Submitted(val requestCount: Int) : ImmichTransportResult
+    data class Failed(val message: String) : ImmichTransportResult
 }
 
 interface ImmichTransport {
@@ -46,14 +55,74 @@ class ApiKeyGatedImmichTransport(
     private val onlineTransport: ImmichOnlineTransport
 ) : ImmichTransport {
 
+    fun selectExecutionPath(apiKey: String?): UploadExecutionPath =
+        if (apiKey.isNullOrBlank()) UploadExecutionPath.BlockedMissingApiKey else UploadExecutionPath.ApiExecution
+
     fun gateStatus(apiKey: String?): TransportGateStatus =
         if (apiKey.isNullOrBlank()) TransportGateStatus.MissingApiKey else TransportGateStatus.Ready
 
     override suspend fun submit(plan: ImmichRequestPlan, apiKey: String?): ImmichTransportResult {
-        if (gateStatus(apiKey) == TransportGateStatus.MissingApiKey) {
+        if (selectExecutionPath(apiKey) == UploadExecutionPath.BlockedMissingApiKey) {
             return ImmichTransportResult.BlockedMissingApiKey(plan)
         }
         return onlineTransport.submit(plan, apiKey.orEmpty())
+    }
+}
+
+interface ImmichApiExecutor {
+    suspend fun execute(request: ImmichApiRequest, apiKey: String): ImmichApiExecutorResult
+}
+
+data class ImmichApiExecutorResult(
+    val statusCode: Int,
+    val responseBody: String
+)
+
+class BrowserImmichApiExecutor : ImmichApiExecutor {
+    override suspend fun execute(request: ImmichApiRequest, apiKey: String): ImmichApiExecutorResult {
+        val init = js("({})")
+        init.method = request.method
+
+        val headers = js("({})")
+        headers["x-api-key"] = apiKey
+        if (request.body != null) {
+            headers["Content-Type"] = "application/json"
+            init.body = request.body
+        }
+        init.headers = headers
+
+        val response = window.fetch(request.url, init).await()
+        val body = response.text().await()
+        return ImmichApiExecutorResult(
+            statusCode = response.status.toInt(),
+            responseBody = body
+        )
+    }
+}
+
+class ApiImmichOnlineTransport(
+    private val executor: ImmichApiExecutor = BrowserImmichApiExecutor()
+) : ImmichOnlineTransport {
+    override suspend fun submit(plan: ImmichRequestPlan, apiKey: String): ImmichTransportResult {
+        val requests = ImmichRequestBuilder.buildPayloadInspectorRequests(plan)
+        requests.forEachIndexed { index, request ->
+            val result = runCatching {
+                executor.execute(request = request, apiKey = apiKey)
+            }.getOrElse { throwable ->
+                val message = throwable.message ?: "Unknown transport failure"
+                return ImmichTransportResult.Failed(
+                    "Request ${index + 1} failed before response: $message"
+                )
+            }
+
+            if (result.statusCode !in 200..299) {
+                return ImmichTransportResult.Failed(
+                    "Request ${index + 1} failed with HTTP ${result.statusCode} (${request.method} ${request.url})."
+                )
+            }
+        }
+
+        return ImmichTransportResult.Submitted(requests.size)
     }
 }
 

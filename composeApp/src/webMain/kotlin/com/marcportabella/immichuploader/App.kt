@@ -68,8 +68,9 @@ fun App() {
             }
         }
 
-        val transport = remember { ApiKeyGatedImmichTransport(DryRunImmichTransport()) }
+        val transport = remember { ApiKeyGatedImmichTransport(ApiImmichOnlineTransport()) }
         val gateStatus = transport.gateStatus(apiKey = state.apiKey.ifBlank { null })
+        val executionPath = transport.selectExecutionPath(apiKey = state.apiKey.ifBlank { null })
         val catalogTransport = remember { ApiKeyGatedImmichCatalogTransport(DryRunImmichCatalogTransport()) }
         val catalogGateStatus = catalogTransport.gateStatus(state.apiKey.ifBlank { null })
         val bulkPreflightFeedback = preflightBulkEditDraft(state)
@@ -88,6 +89,7 @@ fun App() {
             Text("Selected: ${state.selectedAssetIds.size}")
             Text("Staged edits: ${state.stagedEditsByAssetId.size}")
             Text("Transport gate: $gateStatus")
+            Text("Execution path: $executionPath")
             Text("Catalog gate: $catalogGateStatus")
 
             OutlinedTextField(
@@ -215,6 +217,66 @@ fun App() {
                 ) {
                     Text("Clear dry-run")
                 }
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = {
+                        val plan = state.dryRunPlan ?: return@Button
+                        scope.launch {
+                            store.dispatch(
+                                UploadPrepAction.UploadExecutionStarted(
+                                    "Executing ${state.dryRunApiRequests.size} API requests."
+                                )
+                            )
+                            when (val result = transport.submit(plan = plan, apiKey = state.apiKey.ifBlank { null })) {
+                                is ImmichTransportResult.BlockedMissingApiKey ->
+                                    store.dispatch(
+                                        UploadPrepAction.UploadExecutionBlocked(
+                                            "API key required. Upload execution remained blocked."
+                                        )
+                                    )
+
+                                is ImmichTransportResult.DryRun ->
+                                    store.dispatch(
+                                        UploadPrepAction.UploadExecutionFailed(
+                                            "Execution stayed in dry-run mode. Configure executable transport first."
+                                        )
+                                    )
+
+                                is ImmichTransportResult.Submitted ->
+                                    store.dispatch(
+                                        UploadPrepAction.UploadExecutionSubmitted(
+                                            requestCount = result.requestCount,
+                                            message = "Submitted ${result.requestCount} API requests."
+                                        )
+                                    )
+
+                                is ImmichTransportResult.Failed ->
+                                    store.dispatch(
+                                        UploadPrepAction.UploadExecutionFailed(result.message)
+                                    )
+                            }
+                        }
+                    },
+                    enabled = state.dryRunPlan != null && state.executionStatus != UploadExecutionStatus.Executing
+                ) {
+                    Text("Execute API upload")
+                }
+                Button(
+                    onClick = { store.dispatch(UploadPrepAction.ClearUploadExecutionStatus) },
+                    enabled = state.executionMessage != null || state.executionStatus != UploadExecutionStatus.Idle
+                ) {
+                    Text("Clear execution status")
+                }
+            }
+
+            Text("Execution status: ${state.executionStatus}")
+            if (state.executionMessage != null) {
+                Text("Execution message: ${state.executionMessage}")
+            }
+            if (state.executionRequestCount != null) {
+                Text("Submitted requests: ${state.executionRequestCount}")
             }
 
             DryRunInspectorSection(state)

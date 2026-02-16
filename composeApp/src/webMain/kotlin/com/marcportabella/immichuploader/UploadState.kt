@@ -32,6 +32,9 @@ data class UploadPrepState(
     val dryRunPlan: ImmichRequestPlan? = null,
     val dryRunApiRequests: List<ImmichApiRequest> = emptyList(),
     val dryRunMessage: String? = null,
+    val executionStatus: UploadExecutionStatus = UploadExecutionStatus.Idle,
+    val executionMessage: String? = null,
+    val executionRequestCount: Int? = null,
     val batchFeedback: BatchFeedback? = null
 )
 
@@ -51,6 +54,14 @@ enum class CatalogUiStatus {
     Loading,
     Ready,
     BlockedMissingApiKey
+}
+
+enum class UploadExecutionStatus {
+    Idle,
+    Executing,
+    BlockedMissingApiKey,
+    Submitted,
+    Failed
 }
 
 sealed interface UploadPrepAction {
@@ -80,6 +91,11 @@ sealed interface UploadPrepAction {
     ) : UploadPrepAction
     data object GenerateDryRunPreview : UploadPrepAction
     data object ClearDryRunPreview : UploadPrepAction
+    data class UploadExecutionStarted(val message: String) : UploadPrepAction
+    data class UploadExecutionBlocked(val message: String) : UploadPrepAction
+    data class UploadExecutionSubmitted(val requestCount: Int, val message: String) : UploadPrepAction
+    data class UploadExecutionFailed(val message: String) : UploadPrepAction
+    data object ClearUploadExecutionStatus : UploadPrepAction
     data object ClearBatchFeedback : UploadPrepAction
 }
 
@@ -92,6 +108,9 @@ fun reduceUploadPrepState(state: UploadPrepState, action: UploadPrepAction): Upl
                 assets = nextAssets,
                 selectedAssetIds = state.selectedAssetIds.intersect(validIds),
                 stagedEditsByAssetId = state.stagedEditsByAssetId.filterKeys { it in validIds },
+                executionStatus = UploadExecutionStatus.Idle,
+                executionMessage = null,
+                executionRequestCount = null,
                 batchFeedback = null
             )
         }
@@ -173,7 +192,12 @@ fun reduceUploadPrepState(state: UploadPrepState, action: UploadPrepAction): Upl
             batchFeedback = null
         )
 
-        is UploadPrepAction.SetApiKey -> state.copy(apiKey = action.value)
+        is UploadPrepAction.SetApiKey -> state.copy(
+            apiKey = action.value,
+            executionStatus = UploadExecutionStatus.Idle,
+            executionMessage = null,
+            executionRequestCount = null
+        )
 
         is UploadPrepAction.SetAlbumCreateDraft -> state.copy(albumCreateDraft = action.value)
 
@@ -207,6 +231,9 @@ fun reduceUploadPrepState(state: UploadPrepState, action: UploadPrepAction): Upl
             dryRunPlan = action.plan,
             dryRunApiRequests = action.requests,
             dryRunMessage = action.message,
+            executionStatus = UploadExecutionStatus.Idle,
+            executionMessage = null,
+            executionRequestCount = null,
             batchFeedback = BatchFeedback(
                 level = if (action.requests.isEmpty()) BatchFeedbackLevel.Warning else BatchFeedbackLevel.Success,
                 message = action.message
@@ -220,6 +247,9 @@ fun reduceUploadPrepState(state: UploadPrepState, action: UploadPrepAction): Upl
                     dryRunPlan = null,
                     dryRunApiRequests = emptyList(),
                     dryRunMessage = preflightFeedback.message,
+                    executionStatus = UploadExecutionStatus.Idle,
+                    executionMessage = null,
+                    executionRequestCount = null,
                     batchFeedback = preflightFeedback
                 )
             } else {
@@ -240,6 +270,9 @@ fun reduceUploadPrepState(state: UploadPrepState, action: UploadPrepAction): Upl
                     dryRunPlan = plan,
                     dryRunApiRequests = requests,
                     dryRunMessage = feedback.message,
+                    executionStatus = UploadExecutionStatus.Idle,
+                    executionMessage = null,
+                    executionRequestCount = null,
                     batchFeedback = feedback
                 )
             }
@@ -249,7 +282,40 @@ fun reduceUploadPrepState(state: UploadPrepState, action: UploadPrepAction): Upl
             dryRunPlan = null,
             dryRunApiRequests = emptyList(),
             dryRunMessage = null,
+            executionStatus = UploadExecutionStatus.Idle,
+            executionMessage = null,
+            executionRequestCount = null,
             batchFeedback = null
+        )
+
+        is UploadPrepAction.UploadExecutionStarted -> state.copy(
+            executionStatus = UploadExecutionStatus.Executing,
+            executionMessage = action.message,
+            executionRequestCount = null
+        )
+
+        is UploadPrepAction.UploadExecutionBlocked -> state.copy(
+            executionStatus = UploadExecutionStatus.BlockedMissingApiKey,
+            executionMessage = action.message,
+            executionRequestCount = null
+        )
+
+        is UploadPrepAction.UploadExecutionSubmitted -> state.copy(
+            executionStatus = UploadExecutionStatus.Submitted,
+            executionMessage = action.message,
+            executionRequestCount = action.requestCount
+        )
+
+        is UploadPrepAction.UploadExecutionFailed -> state.copy(
+            executionStatus = UploadExecutionStatus.Failed,
+            executionMessage = action.message,
+            executionRequestCount = null
+        )
+
+        UploadPrepAction.ClearUploadExecutionStatus -> state.copy(
+            executionStatus = UploadExecutionStatus.Idle,
+            executionMessage = null,
+            executionRequestCount = null
         )
 
         UploadPrepAction.ClearBatchFeedback -> state.copy(batchFeedback = null)

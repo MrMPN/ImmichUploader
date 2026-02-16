@@ -475,6 +475,76 @@ class ComposeAppWebTest {
     }
 
     @Test
+    fun uploadTransportPathSelectionAndGateFollowApiKeyPresence() {
+        val transport = ApiKeyGatedImmichTransport(DryRunImmichTransport())
+
+        assertEquals(
+            UploadExecutionPath.BlockedMissingApiKey,
+            transport.selectExecutionPath(apiKey = null)
+        )
+        assertEquals(
+            UploadExecutionPath.BlockedMissingApiKey,
+            transport.selectExecutionPath(apiKey = "   ")
+        )
+        assertEquals(
+            UploadExecutionPath.ApiExecution,
+            transport.selectExecutionPath(apiKey = "key")
+        )
+        assertEquals(TransportGateStatus.MissingApiKey, transport.gateStatus(null))
+        assertEquals(TransportGateStatus.Ready, transport.gateStatus("key"))
+    }
+
+    @Test
+    fun uploadExecutionReducerTracksStatusAndClearsOnApiKeyOrDryRunReset() {
+        val started = reduceUploadPrepState(
+            UploadPrepState(),
+            UploadPrepAction.UploadExecutionStarted("running")
+        )
+        assertEquals(UploadExecutionStatus.Executing, started.executionStatus)
+        assertEquals("running", started.executionMessage)
+        assertNull(started.executionRequestCount)
+
+        val submitted = reduceUploadPrepState(
+            started,
+            UploadPrepAction.UploadExecutionSubmitted(
+                requestCount = 3,
+                message = "submitted"
+            )
+        )
+        assertEquals(UploadExecutionStatus.Submitted, submitted.executionStatus)
+        assertEquals("submitted", submitted.executionMessage)
+        assertEquals(3, submitted.executionRequestCount)
+
+        val resetByApiKey = reduceUploadPrepState(
+            submitted,
+            UploadPrepAction.SetApiKey("new-key")
+        )
+        assertEquals(UploadExecutionStatus.Idle, resetByApiKey.executionStatus)
+        assertNull(resetByApiKey.executionMessage)
+        assertNull(resetByApiKey.executionRequestCount)
+
+        val failed = reduceUploadPrepState(
+            resetByApiKey,
+            UploadPrepAction.UploadExecutionFailed("boom")
+        )
+        assertEquals(UploadExecutionStatus.Failed, failed.executionStatus)
+        assertEquals("boom", failed.executionMessage)
+
+        val resetByDryRunClear = reduceUploadPrepState(
+            failed.copy(
+                dryRunPlan = ImmichRequestPlan(),
+                dryRunApiRequests = listOf(
+                    ImmichApiRequest("GET", "$IMMICH_API_BASE_URL/albums")
+                )
+            ),
+            UploadPrepAction.ClearDryRunPreview
+        )
+        assertEquals(UploadExecutionStatus.Idle, resetByDryRunClear.executionStatus)
+        assertNull(resetByDryRunClear.executionMessage)
+        assertNull(resetByDryRunClear.executionRequestCount)
+    }
+
+    @Test
     fun localIntakeMapperBuildsAssetsWithPreviewMetadata() {
         val assets = mapLocalIntakeFilesToAssets(
             listOf(
