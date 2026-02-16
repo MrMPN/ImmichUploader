@@ -4,4 +4,8 @@ interface Platform {
     val name: String
 }
 
-expect fun getPlatform(): Platform
+private class WasmPlatform : Platform {
+    override val name: String = "Web with Kotlin/Wasm"
+}
+
+fun getPlatform(): Platform = WasmPlatform()
