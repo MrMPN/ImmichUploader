@@ -23,11 +23,16 @@ class BrowserImmichApiExecutor : ImmichApiExecutor {
             body = request.body
         )
 
-        val response = fetch(
+        val responseAny = fetch(
             input = request.url,
             init = init
-        ).awaitJs<FetchResponse>()
-        val responseBody = response.text().awaitJs<String>()
+        ).awaitJs<JsAny?>()
+        val response = requireNotNull(responseAny) {
+            "fetch resolved with null response for ${request.method} ${request.url}"
+        }.unsafeCast<FetchResponse>()
+
+        val responseBodyAny = response.text().awaitJs<JsAny?>()
+        val responseBody = responseBodyAny?.toString() ?: ""
         logInfo(
             "[immichuploader][http] <- ${request.method} ${request.url} status=${response.status.toInt()} bodyBytes=${responseBody.length}"
         )

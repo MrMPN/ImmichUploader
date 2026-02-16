@@ -2,6 +2,7 @@ package com.marcportabella.immichuploader.data
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
+import com.marcportabella.immichuploader.web.diagnosticMessage
 import com.marcportabella.immichuploader.web.logError
 
 class ApiImmichOnlineCatalogTransport(
@@ -91,11 +92,11 @@ class ApiImmichOnlineCatalogTransport(
                 onSuccess = { ExecutionAttempt(result = it, errorMessage = null) },
                 onFailure = { throwable ->
                     logError(
-                        "[immichuploader][catalog] request failed: ${request.method} ${request.url} error=${throwable.message ?: throwable}"
+                        "[immichuploader][catalog] request failed: ${request.method} ${request.url} error=${throwable.diagnosticMessage()}"
                     )
                     ExecutionAttempt(
                         result = null,
-                        errorMessage = throwable.message ?: throwable.toString()
+                        errorMessage = throwable.diagnosticMessage()
                     )
                 }
             )
@@ -103,12 +104,13 @@ class ApiImmichOnlineCatalogTransport(
     private fun parseAlbumEntries(responseBody: String): List<ImmichCatalogEntry> =
         runCatching { immichJson.decodeFromString<List<ImmichAlbumResponse>>(responseBody) }
             .onFailure { throwable ->
-                logError("[immichuploader][catalog] album decode failed: ${throwable.message ?: throwable}")
+                logError("[immichuploader][catalog] album decode failed: ${throwable.diagnosticMessage()}")
             }
             .getOrDefault(emptyList())
             .mapNotNull { album ->
+                val id = album.id ?: return@mapNotNull null
                 val name = album.albumName ?: album.name ?: return@mapNotNull null
-                ImmichCatalogEntry(id = album.id, name = name)
+                ImmichCatalogEntry(id = id, name = name)
             }
             .distinctBy { it.id }
             .sortedBy { it.name.lowercase() }
@@ -116,12 +118,13 @@ class ApiImmichOnlineCatalogTransport(
     private fun parseTagEntries(responseBody: String): List<ImmichCatalogEntry> =
         runCatching { immichJson.decodeFromString<List<ImmichTagResponse>>(responseBody) }
             .onFailure { throwable ->
-                logError("[immichuploader][catalog] tag decode failed: ${throwable.message ?: throwable}")
+                logError("[immichuploader][catalog] tag decode failed: ${throwable.diagnosticMessage()}")
             }
             .getOrDefault(emptyList())
             .mapNotNull { tag ->
+                val id = tag.id ?: return@mapNotNull null
                 val name = tag.value ?: tag.name ?: return@mapNotNull null
-                ImmichCatalogEntry(id = tag.id, name = name)
+                ImmichCatalogEntry(id = id, name = name)
             }
             .distinctBy { it.id }
             .sortedBy { it.name.lowercase() }
@@ -134,14 +137,14 @@ private data class ExecutionAttempt(
 
 @Serializable
 private data class ImmichAlbumResponse(
-    val id: String,
+    val id: String? = null,
     val albumName: String? = null,
     val name: String? = null
 )
 
 @Serializable
 private data class ImmichTagResponse(
-    val id: String,
+    val id: String? = null,
     val name: String? = null,
     val value: String? = null
 )
