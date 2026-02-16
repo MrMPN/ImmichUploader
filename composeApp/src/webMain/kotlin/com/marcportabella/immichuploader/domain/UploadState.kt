@@ -15,6 +15,8 @@ data class BulkEditDraft(
     val isFavorite: Boolean = false,
     val includeDateTimeOriginal: Boolean = false,
     val dateTimeOriginal: String = "",
+    val includeTimeZone: Boolean = false,
+    val timeZone: String = "",
     val includeAlbumId: Boolean = false,
     val albumId: String = "",
     val addTagIds: String = "",
@@ -353,6 +355,11 @@ private fun BulkEditDraft.toPatch(): AssetEditPatch? {
         } else {
             FieldPatch.Unset
         },
+        timeZone = if (includeTimeZone && timeZone.isNotBlank()) {
+            FieldPatch.Set(normalizeTimeZoneOffset(timeZone) ?: timeZone)
+        } else {
+            FieldPatch.Unset
+        },
         albumId = if (includeAlbumId) FieldPatch.Set(albumId.ifBlank { null }) else FieldPatch.Unset,
         addTagIds = addTags,
         removeTagIds = removeTags
@@ -362,6 +369,7 @@ private fun BulkEditDraft.toPatch(): AssetEditPatch? {
         patch.description is FieldPatch.Unset &&
         patch.isFavorite is FieldPatch.Unset &&
         patch.dateTimeOriginal is FieldPatch.Unset &&
+        patch.timeZone is FieldPatch.Unset &&
         patch.albumId is FieldPatch.Unset &&
         patch.addTagIds.isEmpty() &&
         patch.removeTagIds.isEmpty()
@@ -392,6 +400,20 @@ fun preflightBulkEditDraft(state: UploadPrepState): BatchFeedback? {
         return BatchFeedback(
             level = BatchFeedbackLevel.Error,
             message = "Date/time must use ISO 8601 UTC format: YYYY-MM-DDTHH:MM:SSZ."
+        )
+    }
+
+    if (draft.includeTimeZone && draft.timeZone.isBlank()) {
+        return BatchFeedback(
+            level = BatchFeedbackLevel.Error,
+            message = "Timezone is required when timezone edit is enabled."
+        )
+    }
+
+    if (draft.includeTimeZone && normalizeTimeZoneOffset(draft.timeZone) == null) {
+        return BatchFeedback(
+            level = BatchFeedbackLevel.Error,
+            message = "Timezone must be Z or an offset like +02:00 / -05:00."
         )
     }
 

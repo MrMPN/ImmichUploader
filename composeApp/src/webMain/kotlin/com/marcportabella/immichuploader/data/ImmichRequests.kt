@@ -126,14 +126,16 @@ object ImmichRequestBuilder {
         val description = (patch.description as? FieldPatch.Set<String?>)?.value
         val isFavorite = (patch.isFavorite as? FieldPatch.Set<Boolean>)?.value
         val dateTimeOriginal = (patch.dateTimeOriginal as? FieldPatch.Set<String>)?.value
+        val timeZone = (patch.timeZone as? FieldPatch.Set<String>)?.value
 
-        if (description == null && isFavorite == null && dateTimeOriginal == null) {
+        if (description == null && isFavorite == null && dateTimeOriginal == null && timeZone == null) {
             return null
         }
 
         return ImmichBulkMetadataRequest(
             ids = assetIds.toList().sorted(),
             dateTimeOriginal = dateTimeOriginal,
+            timeZone = timeZone,
             description = description,
             isFavorite = isFavorite
         )

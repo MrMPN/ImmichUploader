@@ -220,6 +220,7 @@ fun LocalAsset.toDisplayMetadata(patch: AssetEditPatch?): DisplayMetadata {
     val description = (patch?.description as? FieldPatch.Set<String?>)?.value ?: description
     val isFavorite = (patch?.isFavorite as? FieldPatch.Set<Boolean>)?.value ?: isFavorite
     val dateTimeOriginal = (patch?.dateTimeOriginal as? FieldPatch.Set<String>)?.value ?: captureDateTime
+    val timeZone = (patch?.timeZone as? FieldPatch.Set<String>)?.value ?: timeZone
     val albumId = (patch?.albumId as? FieldPatch.Set<String?>)?.value ?: albumId
 
     val addTags = patch?.addTagIds ?: emptySet()

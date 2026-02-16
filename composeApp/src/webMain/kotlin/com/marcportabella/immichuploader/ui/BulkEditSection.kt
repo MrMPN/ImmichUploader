@@ -78,6 +78,22 @@ fun BulkEditSection(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Checkbox(
+                    checked = draft.includeTimeZone,
+                    onCheckedChange = { onDraftChange(draft.copy(includeTimeZone = it)) }
+                )
+                OutlinedTextField(
+                    value = draft.timeZone,
+                    onValueChange = { onDraftChange(draft.copy(timeZone = it)) },
+                    label = { Text("Timezone (e.g. +02:00 or Z)") },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Checkbox(
                     checked = draft.includeDateTimeOriginal,
                     onCheckedChange = { onDraftChange(draft.copy(includeDateTimeOriginal = it)) }
                 )
@@ -152,7 +168,7 @@ fun BulkEditSection(
                 }
             }
 
-            Text("Timezone is shown per asset as read-only metadata.")
+            Text("Timezone can be bulk-assigned for selected assets.")
         }
     }
 }

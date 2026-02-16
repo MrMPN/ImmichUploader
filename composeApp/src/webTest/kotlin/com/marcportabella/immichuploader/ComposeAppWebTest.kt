@@ -778,6 +778,29 @@ class ComposeAppWebTest {
     }
 
     @Test
+    fun payloadInspectorIncludesTimezoneInBulkMetadataPayload() {
+        val id = LocalAssetId("a")
+        val state = UploadPrepState(
+            assets = mapOf(
+                id to LocalAsset(id, "a.jpg", "image/jpeg", 1, null, null, null)
+            ),
+            selectedAssetIds = setOf(id),
+            stagedEditsByAssetId = mapOf(
+                id to AssetEditPatch(
+                    timeZone = FieldPatch.Set("+02:00")
+                )
+            )
+        )
+
+        val plan = ImmichRequestBuilder.buildDryRunPlan(state)
+        val requests = ImmichRequestBuilder.buildPayloadInspectorRequests(plan)
+        val metadataRequest = requests.first { it.url == "$IMMICH_API_BASE_URL/assets/updateAssets" }
+        val body = assertNotNull(metadataRequest.body)
+
+        assertTrue(body.contains("\"timeZone\":\"+02:00\""))
+    }
+
+    @Test
     fun payloadInspectorEscapesJsonForLookupAndPayloadBodies() {
         val requestPlan = ImmichRequestPlan(
             uploadRequests = listOf(
