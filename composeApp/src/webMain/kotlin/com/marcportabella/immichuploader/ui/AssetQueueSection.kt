@@ -10,20 +10,17 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Button
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -35,95 +32,107 @@ import com.marcportabella.immichuploader.domain.LocalAssetId
 import com.marcportabella.immichuploader.domain.UploadPrepState
 import org.jetbrains.skia.Image
 
-@Composable
-fun AssetQueueSection(
+fun LazyListScope.assetQueueSection(
     state: UploadPrepState,
+    sortedAssets: List<LocalAsset>,
+    thumbnailCache: MutableMap<LocalAssetId, ImageBitmap?>,
     onToggleSelection: (LocalAssetId) -> Unit
 ) {
-    val sortedAssets = remember(state.assets) {
-        state.assets.values.sortedBy { it.fileName }
-    }
-    val thumbnailCache = remember { mutableMapOf<LocalAssetId, ImageBitmap?>() }
-    var visibleCount by remember(sortedAssets.size) { mutableStateOf(minOf(sortedAssets.size, 40)) }
-    val visibleAssets = remember(sortedAssets, visibleCount) { sortedAssets.take(visibleCount) }
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .animateContentSize(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+    item(key = "asset-queue-header") {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .animateContentSize(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
-            Text(
-                "Asset queue",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
-            )
-
-            if (state.assets.isEmpty()) {
-                Text("No files selected yet.")
-            } else {
-                Text("Sorted by filename for predictable review.")
-                visibleAssets.forEach { asset ->
-                    val patch = state.stagedEditsByAssetId[asset.id]
-                    val metadata = asset.toDisplayMetadata(patch)
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant
-                        )
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(10.dp),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Checkbox(
-                                checked = asset.id in state.selectedAssetIds,
-                                onCheckedChange = { onToggleSelection(asset.id) }
-                            )
-                            Column(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalArrangement = Arrangement.spacedBy(2.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    AssetPreviewThumbnail(
-                                        asset = asset,
-                                        thumbnailCache = thumbnailCache
-                                    )
-                                    Column(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        verticalArrangement = Arrangement.spacedBy(2.dp)
-                                    ) {
-                                        Text(asset.fileName, fontWeight = FontWeight.Medium)
-                                        Text("${asset.mimeType} · ${asset.fileSizeBytes} bytes")
-                                        Text("Date/time: ${metadata.dateTimeOriginal ?: "Unknown"}")
-                                        Text("Timezone: ${metadata.timeZone ?: "Unknown"} (read-only)")
-                                        Text("Camera: ${metadata.cameraLabel ?: "Unknown"}")
-                                        Text("Description: ${metadata.description ?: "None"}")
-                                        Text("Favorite: ${metadata.isFavorite?.toString() ?: "None"}")
-                                        Text("Album: ${metadata.albumId ?: "None"}")
-                                        Text("Tags: ${if (metadata.tagIds.isEmpty()) "None" else metadata.tagIds.joinToString(", ")}")
-                                        if (metadata.exifSummary != null) {
-                                            Text("EXIF: ${metadata.exifSummary}")
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    "Asset queue",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                if (sortedAssets.isEmpty()) {
+                    Text("No files selected yet.")
+                } else {
+                    Text("Sorted by filename for predictable review.")
                 }
+            }
+        }
+    }
 
-                if (visibleCount < sortedAssets.size) {
-                    Button(onClick = { visibleCount = minOf(sortedAssets.size, visibleCount + 40) }) {
-                        Text("Show more (${sortedAssets.size - visibleCount} remaining)")
+    if (sortedAssets.isNotEmpty()) {
+        items(
+            items = sortedAssets,
+            key = { it.id.value }
+        ) { asset ->
+            val patch = state.stagedEditsByAssetId[asset.id]
+            val metadata = asset.toDisplayMetadata(patch)
+            AssetQueueRow(
+                asset = asset,
+                metadata = metadata,
+                isSelected = asset.id in state.selectedAssetIds,
+                thumbnailCache = thumbnailCache,
+                onToggleSelection = onToggleSelection
+            )
+        }
+    }
+}
+
+@Composable
+private fun AssetQueueRow(
+    asset: LocalAsset,
+    metadata: DisplayMetadata,
+    isSelected: Boolean,
+    thumbnailCache: MutableMap<LocalAssetId, ImageBitmap?>,
+    onToggleSelection: (LocalAssetId) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Checkbox(
+                checked = isSelected,
+                onCheckedChange = { onToggleSelection(asset.id) }
+            )
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    AssetPreviewThumbnail(
+                        asset = asset,
+                        thumbnailCache = thumbnailCache
+                    )
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        Text(asset.fileName, fontWeight = FontWeight.Medium)
+                        Text("${asset.mimeType} · ${asset.fileSizeBytes} bytes")
+                        Text("Date/time: ${metadata.dateTimeOriginal ?: "Unknown"}")
+                        Text("Timezone: ${metadata.timeZone ?: "Unknown"} (read-only)")
+                        Text("Camera: ${metadata.cameraLabel ?: "Unknown"}")
+                        Text("Description: ${metadata.description ?: "None"}")
+                        Text("Favorite: ${metadata.isFavorite?.toString() ?: "None"}")
+                        Text("Album: ${metadata.albumId ?: "None"}")
+                        Text("Tags: ${if (metadata.tagIds.isEmpty()) "None" else metadata.tagIds.joinToString(", ")}")
+                        if (metadata.exifSummary != null) {
+                            Text("EXIF: ${metadata.exifSummary}")
+                        }
                     }
                 }
             }
