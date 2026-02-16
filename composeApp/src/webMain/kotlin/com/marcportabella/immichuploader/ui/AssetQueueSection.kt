@@ -81,6 +81,8 @@ fun LazyListScope.assetQueueSection(
     }
 }
 
+private const val ENABLE_QUEUE_PREVIEWS = false
+
 @Composable
 private fun AssetQueueRow(
     asset: LocalAsset,
@@ -113,10 +115,14 @@ private fun AssetQueueRow(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    AssetPreviewThumbnail(
-                        asset = asset,
-                        thumbnailCache = thumbnailCache
-                    )
+                    if (ENABLE_QUEUE_PREVIEWS) {
+                        AssetPreviewThumbnail(
+                            asset = asset,
+                            thumbnailCache = thumbnailCache
+                        )
+                    } else {
+                        PreviewDisabledPlaceholder(asset.mimeType)
+                    }
                     Column(
                         modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(2.dp)
@@ -172,6 +178,24 @@ private fun AssetPreviewThumbnail(
 
     Text(
         text = fallback,
+        style = MaterialTheme.typography.labelSmall,
+        modifier = Modifier
+            .size(92.dp)
+            .clip(MaterialTheme.shapes.small)
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(8.dp)
+    )
+}
+
+@Composable
+private fun PreviewDisabledPlaceholder(mimeType: String) {
+    val label = when {
+        mimeType.startsWith("image/") -> "Image preview disabled"
+        mimeType.startsWith("video/") -> "Video preview disabled"
+        else -> "Preview disabled"
+    }
+    Text(
+        text = label,
         style = MaterialTheme.typography.labelSmall,
         modifier = Modifier
             .size(92.dp)
