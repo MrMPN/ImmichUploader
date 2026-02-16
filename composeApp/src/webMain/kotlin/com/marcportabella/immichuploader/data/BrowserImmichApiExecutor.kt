@@ -5,6 +5,7 @@ import kotlin.js.JsAny
 import kotlin.js.Promise
 
 class BrowserImmichApiExecutor : ImmichApiExecutor {
+    @OptIn(ExperimentalWasmJsInterop::class)
     override suspend fun execute(request: ImmichApiRequest, apiKey: String): ImmichApiExecutorResult {
         val headers = Headers().apply {
             append("x-api-key", apiKey)
@@ -48,9 +49,12 @@ private external class RequestInit(
     var body: String?
 }
 
+@OptIn(ExperimentalWasmJsInterop::class)
 private external interface FetchResponse : JsAny {
     val status: Short
+    @OptIn(ExperimentalWasmJsInterop::class)
     fun text(): Promise<JsAny?>
 }
 
+@OptIn(ExperimentalWasmJsInterop::class)
 private external fun fetch(input: String, init: RequestInit): Promise<JsAny?>

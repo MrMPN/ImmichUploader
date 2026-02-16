@@ -15,6 +15,7 @@ import org.w3c.files.FileReader
 import kotlin.coroutines.resume
 import kotlin.math.roundToInt
 
+@OptIn(ExperimentalWasmJsInterop::class)
 suspend fun File.toLocalIntakeFile(): LocalIntakeFile {
     val previewUrl = if (type.startsWith("image/") || type.startsWith("video/")) {
         createObjectUrl(this)
@@ -71,6 +72,7 @@ suspend fun File.toLocalIntakeFile(): LocalIntakeFile {
     )
 }
 
+@OptIn(ExperimentalWasmJsInterop::class)
 private suspend fun File.createDownscaledPreviewBytes(
     maxDimension: Int
 ): ByteArray? = suspendCancellableCoroutine { continuation ->
@@ -95,8 +97,8 @@ private suspend fun File.createDownscaledPreviewBytes(
     }
 
     image.onload = {
-        val width = image.naturalWidth.toInt().takeIf { it > 0 } ?: image.width
-        val height = image.naturalHeight.toInt().takeIf { it > 0 } ?: image.height
+        val width = image.naturalWidth.takeIf { it > 0 } ?: image.width
+        val height = image.naturalHeight.takeIf { it > 0 } ?: image.height
         if (width <= 0 || height <= 0) {
             finish(null)
         } else {
