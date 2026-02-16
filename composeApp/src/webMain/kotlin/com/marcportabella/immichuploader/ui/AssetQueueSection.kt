@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
@@ -36,6 +38,10 @@ fun AssetQueueSection(
     state: UploadPrepState,
     onToggleSelection: (LocalAssetId) -> Unit
 ) {
+    val sortedAssets = remember(state.assets) {
+        state.assets.values.sortedBy { it.fileName }
+    }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -57,51 +63,58 @@ fun AssetQueueSection(
             } else {
                 Text("Sorted by filename for predictable review.")
 
-                state.assets.values.sortedBy { it.fileName }.forEach { asset ->
-                    val patch = state.stagedEditsByAssetId[asset.id]
-                    val metadata = asset.toDisplayMetadata(patch)
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant
-                        )
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(10.dp),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Checkbox(
-                                checked = asset.id in state.selectedAssetIds,
-                                onCheckedChange = { onToggleSelection(asset.id) }
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 620.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(sortedAssets, key = { it.id.value }) { asset ->
+                        val patch = state.stagedEditsByAssetId[asset.id]
+                        val metadata = asset.toDisplayMetadata(patch)
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant
                             )
-                            Column(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(10.dp),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                Row(
+                                Checkbox(
+                                    checked = asset.id in state.selectedAssetIds,
+                                    onCheckedChange = { onToggleSelection(asset.id) }
+                                )
+                                Column(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    verticalArrangement = Arrangement.spacedBy(2.dp)
                                 ) {
-                                    AssetPreviewThumbnail(asset)
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .heightIn(min = 92.dp),
-                                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                                     ) {
-                                        Text(asset.fileName, fontWeight = FontWeight.Medium)
-                                        Text("${asset.mimeType} · ${asset.fileSizeBytes} bytes")
-                                        Text("Date/time: ${metadata.dateTimeOriginal ?: "Unknown"}")
-                                        Text("Timezone: ${metadata.timeZone ?: "Unknown"} (read-only)")
-                                        Text("Camera: ${metadata.cameraLabel ?: "Unknown"}")
-                                        Text("Description: ${metadata.description ?: "None"}")
-                                        Text("Favorite: ${metadata.isFavorite?.toString() ?: "None"}")
-                                        Text("Album: ${metadata.albumId ?: "None"}")
-                                        Text("Tags: ${if (metadata.tagIds.isEmpty()) "None" else metadata.tagIds.joinToString(", ")}")
-                                        if (metadata.exifSummary != null) {
-                                            Text("EXIF: ${metadata.exifSummary}")
+                                        AssetPreviewThumbnail(asset)
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .heightIn(min = 92.dp),
+                                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                                        ) {
+                                            Text(asset.fileName, fontWeight = FontWeight.Medium)
+                                            Text("${asset.mimeType} · ${asset.fileSizeBytes} bytes")
+                                            Text("Date/time: ${metadata.dateTimeOriginal ?: "Unknown"}")
+                                            Text("Timezone: ${metadata.timeZone ?: "Unknown"} (read-only)")
+                                            Text("Camera: ${metadata.cameraLabel ?: "Unknown"}")
+                                            Text("Description: ${metadata.description ?: "None"}")
+                                            Text("Favorite: ${metadata.isFavorite?.toString() ?: "None"}")
+                                            Text("Album: ${metadata.albumId ?: "None"}")
+                                            Text("Tags: ${if (metadata.tagIds.isEmpty()) "None" else metadata.tagIds.joinToString(", ")}")
+                                            if (metadata.exifSummary != null) {
+                                                Text("EXIF: ${metadata.exifSummary}")
+                                            }
                                         }
                                     }
                                 }
