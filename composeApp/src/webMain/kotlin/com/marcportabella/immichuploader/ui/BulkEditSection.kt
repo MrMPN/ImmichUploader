@@ -12,6 +12,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -19,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.marcportabella.immichuploader.data.ImmichCatalogEntry
 import com.marcportabella.immichuploader.domain.BulkEditDraft
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -28,6 +30,9 @@ fun BulkEditSection(
     selectedCount: Int,
     applyEnabled: Boolean,
     preflightMessage: String?,
+    availableAlbums: List<ImmichCatalogEntry>,
+    availableTags: List<ImmichCatalogEntry>,
+    selectedTagIds: Set<String>,
     onDraftChange: (BulkEditDraft) -> Unit,
     onApply: () -> Unit,
     onClearDraft: () -> Unit,
@@ -71,6 +76,32 @@ fun BulkEditSection(
                     label = { Text("Description") },
                     modifier = Modifier.weight(1f)
                 )
+            }
+
+            if (availableAlbums.isNotEmpty()) {
+                Text("Choose album", style = MaterialTheme.typography.labelMedium)
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    availableAlbums.forEach { album ->
+                        val selected = draft.includeAlbumId && draft.albumId == album.id
+                        FilterChip(
+                            selected = selected,
+                            onClick = {
+                                onDraftChange(
+                                    if (selected) {
+                                        draft.copy(includeAlbumId = false, albumId = "")
+                                    } else {
+                                        draft.copy(includeAlbumId = true, albumId = album.id)
+                                    }
+                                )
+                            },
+                            label = { Text(album.name) }
+                        )
+                    }
+                }
             }
 
             Row(
@@ -140,6 +171,27 @@ fun BulkEditSection(
                 label = { Text("Add tag IDs (comma separated)") },
                 modifier = Modifier.fillMaxWidth()
             )
+
+            if (availableTags.isNotEmpty()) {
+                Text("Select tags to add", style = MaterialTheme.typography.labelMedium)
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    availableTags.forEach { tag ->
+                        val selected = tag.id in selectedTagIds
+                        FilterChip(
+                            selected = selected,
+                            onClick = {
+                                val next = if (selected) selectedTagIds - tag.id else selectedTagIds + tag.id
+                                onDraftChange(draft.copy(addTagIds = next.sorted().joinToString(",")))
+                            },
+                            label = { Text(tag.name) }
+                        )
+                    }
+                }
+            }
 
             OutlinedTextField(
                 value = draft.removeTagIds,

@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -36,8 +37,11 @@ fun SelectionSidebarPane(
     onBulkDraftChange: (BulkEditDraft) -> Unit,
     onApplyBulk: () -> Unit,
     onClearBulkDraft: () -> Unit,
-    onClearSelectedStaged: () -> Unit
+    onClearSelectedStaged: () -> Unit,
+    onClearCatalogMessage: () -> Unit
 ) {
+    val selectedCatalogTagIds = parseCsvIds(state.bulkEditDraft.addTagIds)
+
     when (selectedAssets.size) {
         0 -> {
             Card(
@@ -55,6 +59,10 @@ fun SelectionSidebarPane(
                     )
                     Text("No files selected.")
                     Text("Select one asset to inspect and edit metadata, or select multiple for bulk editing.")
+                    Text("Albums loaded: ${state.availableAlbums.size} | Tags loaded: ${state.availableTags.size}")
+                    state.catalogMessage?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall)
+                    }
                 }
             }
         }
@@ -65,6 +73,8 @@ fun SelectionSidebarPane(
             SingleSelectionEditorCard(
                 asset = asset,
                 patch = patch,
+                availableAlbums = state.availableAlbums,
+                availableTags = state.availableTags,
                 onPatch = { onSingleAssetPatch(asset.id, it) },
                 onClearStaged = onClearSingleSelectionStaged
             )
@@ -93,11 +103,31 @@ fun SelectionSidebarPane(
                 selectedCount = state.selectedAssetIds.size,
                 applyEnabled = canApplyBulkEdit(state),
                 preflightMessage = preflightMessage,
+                availableAlbums = state.availableAlbums,
+                availableTags = state.availableTags,
+                selectedTagIds = selectedCatalogTagIds,
                 onDraftChange = onBulkDraftChange,
                 onApply = onApplyBulk,
                 onClearDraft = onClearBulkDraft,
                 onClearSelectedStaged = onClearSelectedStaged
             )
+
+            state.catalogMessage?.let { message ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(message, style = MaterialTheme.typography.bodySmall)
+                        Button(onClick = onClearCatalogMessage) {
+                            Text("Dismiss message")
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -107,6 +137,8 @@ fun SelectionSidebarPane(
 private fun SingleSelectionEditorCard(
     asset: LocalAsset,
     patch: AssetEditPatch?,
+    availableAlbums: List<com.marcportabella.immichuploader.data.ImmichCatalogEntry>,
+    availableTags: List<com.marcportabella.immichuploader.data.ImmichCatalogEntry>,
     onPatch: (AssetEditPatch) -> Unit,
     onClearStaged: () -> Unit
 ) {
@@ -183,6 +215,49 @@ private fun SingleSelectionEditorCard(
                 modifier = Modifier.fillMaxWidth()
             )
 
+            if (availableAlbums.isNotEmpty()) {
+                Text("Choose album", style = MaterialTheme.typography.labelMedium)
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    availableAlbums.forEach { album ->
+                        FilterChip(
+                            selected = metadata.albumId == album.id,
+                            onClick = {
+                                val nextAlbumId = if (metadata.albumId == album.id) null else album.id
+                                onPatch(AssetEditPatch(albumId = FieldPatch.Set(nextAlbumId)))
+                            },
+                            label = { Text(album.name) }
+                        )
+                    }
+                }
+            }
+
+            if (availableTags.isNotEmpty()) {
+                Text("Select tags for upload", style = MaterialTheme.typography.labelMedium)
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    availableTags.forEach { tag ->
+                        val selected = tag.id in metadata.tagIds
+                        FilterChip(
+                            selected = selected,
+                            onClick = {
+                                val desired = if (selected) metadata.tagIds - tag.id else metadata.tagIds + tag.id
+                                val addTagIds = desired - asset.tagIds
+                                val removeTagIds = asset.tagIds - desired
+                                onPatch(AssetEditPatch(addTagIds = addTagIds, removeTagIds = removeTagIds))
+                            },
+                            label = { Text(tag.name) }
+                        )
+                    }
+                }
+            }
+
             FlowRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -204,3 +279,10 @@ private fun SingleSelectionEditorCard(
         }
     }
 }
+
+private fun parseCsvIds(value: String): Set<String> =
+    value
+        .split(",")
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+        .toSet()

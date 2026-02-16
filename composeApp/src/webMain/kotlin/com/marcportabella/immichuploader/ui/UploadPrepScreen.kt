@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.safeContentPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.graphics.ImageBitmap
@@ -21,7 +23,6 @@ import com.marcportabella.immichuploader.data.ApiImmichOnlineCatalogTransport
 import com.marcportabella.immichuploader.data.ApiImmichOnlineTransport
 import com.marcportabella.immichuploader.data.ApiKeyGatedImmichCatalogTransport
 import com.marcportabella.immichuploader.data.ApiKeyGatedImmichTransport
-import com.marcportabella.immichuploader.data.ImmichCatalogResult
 import com.marcportabella.immichuploader.data.ImmichTransportResult
 import com.marcportabella.immichuploader.domain.LocalAssetId
 import com.marcportabella.immichuploader.domain.UploadPrepAction
@@ -85,6 +86,31 @@ fun UploadPrepScreen(store: UploadPrepStore) {
         state.selectedAssetIds.mapNotNull { state.assets[it] }.sortedBy { it.fileName }
     }
     val thumbnailCache = remember { mutableMapOf<LocalAssetId, ImageBitmap?>() }
+    val catalogLoadedAtInit = remember { mutableStateOf(false) }
+
+    LaunchedEffect(state.apiKey) {
+        if (catalogLoadedAtInit.value) return@LaunchedEffect
+        catalogLoadedAtInit.value = true
+
+        store.dispatch(UploadPrepAction.CatalogRequestStarted)
+        val apiKey = state.apiKey.ifBlank { null }
+
+        when (val albumResult = catalogTransport.lookupAlbums(apiKey)) {
+            is com.marcportabella.immichuploader.data.ImmichCatalogResult.BlockedMissingApiKey ->
+                store.dispatch(UploadPrepAction.CatalogBlockedMissingApiKey(albumResult.message))
+
+            is com.marcportabella.immichuploader.data.ImmichCatalogResult.Success ->
+                store.dispatch(UploadPrepAction.CatalogAlbumsLoaded(albumResult.entries, albumResult.message))
+        }
+
+        when (val tagResult = catalogTransport.lookupTags(apiKey)) {
+            is com.marcportabella.immichuploader.data.ImmichCatalogResult.BlockedMissingApiKey ->
+                store.dispatch(UploadPrepAction.CatalogBlockedMissingApiKey(tagResult.message))
+
+            is com.marcportabella.immichuploader.data.ImmichCatalogResult.Success ->
+                store.dispatch(UploadPrepAction.CatalogTagsLoaded(tagResult.entries, tagResult.message))
+        }
+    }
 
     val openFilePicker: () -> Unit = {
         val input = document.getElementById("local-file-input") as? HTMLInputElement
@@ -117,62 +143,6 @@ fun UploadPrepScreen(store: UploadPrepStore) {
             }
         }
         Unit
-    }
-
-    val lookupAlbums: () -> Unit = {
-        scope.launch {
-            store.dispatch(UploadPrepAction.CatalogRequestStarted)
-            when (val result = catalogTransport.lookupAlbums(state.apiKey.ifBlank { null })) {
-                is ImmichCatalogResult.BlockedMissingApiKey ->
-                    store.dispatch(UploadPrepAction.CatalogBlockedMissingApiKey(result.message))
-
-                is ImmichCatalogResult.Success ->
-                    store.dispatch(UploadPrepAction.CatalogAlbumsLoaded(result.entries, result.message))
-            }
-        }
-    }
-
-    val lookupTags: () -> Unit = {
-        scope.launch {
-            store.dispatch(UploadPrepAction.CatalogRequestStarted)
-            when (val result = catalogTransport.lookupTags(state.apiKey.ifBlank { null })) {
-                is ImmichCatalogResult.BlockedMissingApiKey ->
-                    store.dispatch(UploadPrepAction.CatalogBlockedMissingApiKey(result.message))
-
-                is ImmichCatalogResult.Success ->
-                    store.dispatch(UploadPrepAction.CatalogTagsLoaded(result.entries, result.message))
-            }
-        }
-    }
-
-    val createAlbum: () -> Unit = {
-        scope.launch {
-            store.dispatch(UploadPrepAction.CatalogRequestStarted)
-            when (val result = catalogTransport.createAlbumIfMissing(state.apiKey.ifBlank { null }, state.albumCreateDraft)) {
-                is ImmichCatalogResult.BlockedMissingApiKey ->
-                    store.dispatch(UploadPrepAction.CatalogBlockedMissingApiKey(result.message))
-
-                is ImmichCatalogResult.Success -> {
-                    store.dispatch(UploadPrepAction.CatalogAlbumsLoaded(result.entries, result.message))
-                    store.dispatch(UploadPrepAction.SetAlbumCreateDraft(""))
-                }
-            }
-        }
-    }
-
-    val createTag: () -> Unit = {
-        scope.launch {
-            store.dispatch(UploadPrepAction.CatalogRequestStarted)
-            when (val result = catalogTransport.createTagIfMissing(state.apiKey.ifBlank { null }, state.tagCreateDraft)) {
-                is ImmichCatalogResult.BlockedMissingApiKey ->
-                    store.dispatch(UploadPrepAction.CatalogBlockedMissingApiKey(result.message))
-
-                is ImmichCatalogResult.Success -> {
-                    store.dispatch(UploadPrepAction.CatalogTagsLoaded(result.entries, result.message))
-                    store.dispatch(UploadPrepAction.SetTagCreateDraft(""))
-                }
-            }
-        }
     }
 
     BoxWithConstraints(
@@ -226,7 +196,8 @@ fun UploadPrepScreen(store: UploadPrepStore) {
                         onBulkDraftChange = { store.dispatch(UploadPrepAction.SetBulkEditDraft(it)) },
                         onApplyBulk = { store.dispatch(UploadPrepAction.ApplyBulkEditDraftToSelected) },
                         onClearBulkDraft = { store.dispatch(UploadPrepAction.ClearBulkEditDraft) },
-                        onClearSelectedStaged = { store.dispatch(UploadPrepAction.ClearStagedForSelected) }
+                        onClearSelectedStaged = { store.dispatch(UploadPrepAction.ClearStagedForSelected) },
+                        onClearCatalogMessage = { store.dispatch(UploadPrepAction.ClearCatalogMessage) }
                     )
                 }
 
@@ -237,19 +208,6 @@ fun UploadPrepScreen(store: UploadPrepStore) {
                             onDismiss = { store.dispatch(UploadPrepAction.ClearBatchFeedback) }
                         )
                     }
-                }
-
-                item {
-                    CatalogSection(
-                        state = state,
-                        onLookupAlbums = lookupAlbums,
-                        onLookupTags = lookupTags,
-                        onAlbumDraftChange = { store.dispatch(UploadPrepAction.SetAlbumCreateDraft(it)) },
-                        onTagDraftChange = { store.dispatch(UploadPrepAction.SetTagCreateDraft(it)) },
-                        onCreateAlbum = createAlbum,
-                        onCreateTag = createTag,
-                        onClearMessage = { store.dispatch(UploadPrepAction.ClearCatalogMessage) }
-                    )
                 }
 
                 item {
@@ -320,7 +278,8 @@ fun UploadPrepScreen(store: UploadPrepStore) {
                             onBulkDraftChange = { store.dispatch(UploadPrepAction.SetBulkEditDraft(it)) },
                             onApplyBulk = { store.dispatch(UploadPrepAction.ApplyBulkEditDraftToSelected) },
                             onClearBulkDraft = { store.dispatch(UploadPrepAction.ClearBulkEditDraft) },
-                            onClearSelectedStaged = { store.dispatch(UploadPrepAction.ClearStagedForSelected) }
+                            onClearSelectedStaged = { store.dispatch(UploadPrepAction.ClearStagedForSelected) },
+                            onClearCatalogMessage = { store.dispatch(UploadPrepAction.ClearCatalogMessage) }
                         )
                     }
                     if (state.batchFeedback != null) {
@@ -330,18 +289,6 @@ fun UploadPrepScreen(store: UploadPrepStore) {
                                 onDismiss = { store.dispatch(UploadPrepAction.ClearBatchFeedback) }
                             )
                         }
-                    }
-                    item {
-                        CatalogSection(
-                            state = state,
-                            onLookupAlbums = lookupAlbums,
-                            onLookupTags = lookupTags,
-                            onAlbumDraftChange = { store.dispatch(UploadPrepAction.SetAlbumCreateDraft(it)) },
-                            onTagDraftChange = { store.dispatch(UploadPrepAction.SetTagCreateDraft(it)) },
-                            onCreateAlbum = createAlbum,
-                            onCreateTag = createTag,
-                            onClearMessage = { store.dispatch(UploadPrepAction.ClearCatalogMessage) }
-                        )
                     }
                     item {
                         RequestPlanExecutionCard(
