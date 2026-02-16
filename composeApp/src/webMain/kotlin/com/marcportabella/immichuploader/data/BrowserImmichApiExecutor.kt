@@ -9,35 +9,27 @@ class BrowserImmichApiExecutor : ImmichApiExecutor {
     @OptIn(ExperimentalWasmJsInterop::class)
     override suspend fun execute(request: ImmichApiRequest, apiKey: String): ImmichApiExecutorResult {
         logInfo("[immichuploader][http] -> ${request.method} ${request.url}")
-        logInfo("[immichuploader][http] stage=headers:init")
         val headers = createHeaders()
-        logInfo("[immichuploader][http] stage=headers:append-api-key")
         headers.append("x-api-key", apiKey)
-        logInfo("[immichuploader][http] stage=headers:append-accept")
         headers.append("Accept", "application/json")
         if (request.body != null) {
-            logInfo("[immichuploader][http] stage=headers:append-content-type")
             headers.append("Content-Type", "application/json")
         }
 
-        logInfo("[immichuploader][http] stage=request-init:create")
         val init = createRequestInit(
             method = request.method,
             headers = headers,
             body = request.body
         )
 
-        logInfo("[immichuploader][http] stage=fetch:call")
         val responseAny = fetch(
             input = request.url,
             init = init
         ).awaitJs<JsAny?>()
-        logInfo("[immichuploader][http] stage=fetch:resolved")
         val response = requireNotNull(responseAny) {
             "fetch resolved with null response for ${request.method} ${request.url}"
         }.unsafeCast<FetchResponse>()
 
-        logInfo("[immichuploader][http] stage=response:text")
         val responseBodyAny = response.text().awaitJs<JsAny?>()
         val responseBody = responseBodyAny?.toString() ?: ""
         logInfo(
