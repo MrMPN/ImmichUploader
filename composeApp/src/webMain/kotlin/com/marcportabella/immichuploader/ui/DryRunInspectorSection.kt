@@ -31,7 +31,7 @@ fun DryRunInspectorSection(state: UploadPrepState) {
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
-                "Dry-run payload inspector",
+                "Request payload inspector",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold
             )

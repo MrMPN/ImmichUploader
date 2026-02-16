@@ -449,7 +449,7 @@ private fun preflightDryRun(state: UploadPrepState): BatchFeedback? {
     if (state.selectedAssetIds.isEmpty()) {
         return BatchFeedback(
             level = BatchFeedbackLevel.Error,
-            message = "Select at least one asset before generating a dry-run plan."
+            message = "Select at least one asset before generating a request plan."
         )
     }
 

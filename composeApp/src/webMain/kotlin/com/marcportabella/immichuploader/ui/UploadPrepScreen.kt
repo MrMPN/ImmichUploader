@@ -132,13 +132,6 @@ fun UploadPrepScreen(store: UploadPrepStore) {
                         )
                     )
 
-                is ImmichTransportResult.DryRun ->
-                    store.dispatch(
-                        UploadPrepAction.UploadExecutionFailed(
-                            "Execution stayed in dry-run mode. Configure executable transport first."
-                        )
-                    )
-
                 is ImmichTransportResult.Submitted ->
                     store.dispatch(
                         UploadPrepAction.UploadExecutionSubmitted(
@@ -232,7 +225,7 @@ fun UploadPrepScreen(store: UploadPrepStore) {
                                     is ImmichCatalogResult.BlockedMissingApiKey ->
                                         store.dispatch(UploadPrepAction.CatalogBlockedMissingApiKey(result.message))
 
-                                    is ImmichCatalogResult.DryRunSuccess ->
+                                    is ImmichCatalogResult.Success ->
                                         store.dispatch(UploadPrepAction.CatalogAlbumsLoaded(result.entries, result.message))
                                 }
                             }
@@ -244,7 +237,7 @@ fun UploadPrepScreen(store: UploadPrepStore) {
                                     is ImmichCatalogResult.BlockedMissingApiKey ->
                                         store.dispatch(UploadPrepAction.CatalogBlockedMissingApiKey(result.message))
 
-                                    is ImmichCatalogResult.DryRunSuccess ->
+                                    is ImmichCatalogResult.Success ->
                                         store.dispatch(UploadPrepAction.CatalogTagsLoaded(result.entries, result.message))
                                 }
                             }
@@ -263,7 +256,7 @@ fun UploadPrepScreen(store: UploadPrepStore) {
                                     is ImmichCatalogResult.BlockedMissingApiKey ->
                                         store.dispatch(UploadPrepAction.CatalogBlockedMissingApiKey(result.message))
 
-                                    is ImmichCatalogResult.DryRunSuccess -> {
+                                    is ImmichCatalogResult.Success -> {
                                         store.dispatch(UploadPrepAction.CatalogAlbumsLoaded(result.entries, result.message))
                                         store.dispatch(UploadPrepAction.SetAlbumCreateDraft(""))
                                     }
@@ -282,7 +275,7 @@ fun UploadPrepScreen(store: UploadPrepStore) {
                                     is ImmichCatalogResult.BlockedMissingApiKey ->
                                         store.dispatch(UploadPrepAction.CatalogBlockedMissingApiKey(result.message))
 
-                                    is ImmichCatalogResult.DryRunSuccess -> {
+                                    is ImmichCatalogResult.Success -> {
                                         store.dispatch(UploadPrepAction.CatalogTagsLoaded(result.entries, result.message))
                                         store.dispatch(UploadPrepAction.SetTagCreateDraft(""))
                                     }
@@ -384,7 +377,7 @@ fun UploadPrepScreen(store: UploadPrepStore) {
                                         is ImmichCatalogResult.BlockedMissingApiKey ->
                                             store.dispatch(UploadPrepAction.CatalogBlockedMissingApiKey(result.message))
 
-                                        is ImmichCatalogResult.DryRunSuccess ->
+                                        is ImmichCatalogResult.Success ->
                                             store.dispatch(
                                                 UploadPrepAction.CatalogAlbumsLoaded(result.entries, result.message)
                                             )
@@ -398,7 +391,7 @@ fun UploadPrepScreen(store: UploadPrepStore) {
                                         is ImmichCatalogResult.BlockedMissingApiKey ->
                                             store.dispatch(UploadPrepAction.CatalogBlockedMissingApiKey(result.message))
 
-                                        is ImmichCatalogResult.DryRunSuccess ->
+                                        is ImmichCatalogResult.Success ->
                                             store.dispatch(UploadPrepAction.CatalogTagsLoaded(result.entries, result.message))
                                     }
                                 }
@@ -417,7 +410,7 @@ fun UploadPrepScreen(store: UploadPrepStore) {
                                         is ImmichCatalogResult.BlockedMissingApiKey ->
                                             store.dispatch(UploadPrepAction.CatalogBlockedMissingApiKey(result.message))
 
-                                        is ImmichCatalogResult.DryRunSuccess -> {
+                                        is ImmichCatalogResult.Success -> {
                                             store.dispatch(
                                                 UploadPrepAction.CatalogAlbumsLoaded(result.entries, result.message)
                                             )
@@ -438,7 +431,7 @@ fun UploadPrepScreen(store: UploadPrepStore) {
                                         is ImmichCatalogResult.BlockedMissingApiKey ->
                                             store.dispatch(UploadPrepAction.CatalogBlockedMissingApiKey(result.message))
 
-                                        is ImmichCatalogResult.DryRunSuccess -> {
+                                        is ImmichCatalogResult.Success -> {
                                             store.dispatch(UploadPrepAction.CatalogTagsLoaded(result.entries, result.message))
                                             store.dispatch(UploadPrepAction.SetTagCreateDraft(""))
                                         }
@@ -487,7 +480,7 @@ private fun SummaryHeaderCard(
                 fontWeight = FontWeight.SemiBold
             )
             Text(
-                text = "Prepare metadata, validate the dry-run payload, then execute upload safely.",
+                text = "Prepare metadata, validate the request payload, then execute upload safely.",
                 style = MaterialTheme.typography.bodyMedium
             )
             FlowRow(
@@ -755,12 +748,12 @@ private fun DryRunExecutionCard(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Text(
-                "Dry-run and execution",
+                "Request plan and execution",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold
             )
             Text(
-                "Generate a preview before execution to verify payload details and request count.",
+                "Generate a request plan preview before execution to verify payload details and request count.",
                 style = MaterialTheme.typography.bodySmall
             )
             FlowRow(
@@ -772,13 +765,13 @@ private fun DryRunExecutionCard(
                     onClick = onGenerateDryRun,
                     enabled = state.selectedAssetIds.isNotEmpty()
                 ) {
-                    Text("Generate dry-run plan")
+                    Text("Generate request plan")
                 }
                 Button(
                     onClick = onClearDryRun,
                     enabled = state.dryRunPlan != null
                 ) {
-                    Text("Clear dry-run")
+                    Text("Clear plan")
                 }
                 Button(
                     onClick = onExecute,

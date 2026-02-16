@@ -2,14 +2,14 @@ package com.marcportabella.immichuploader
 
 import com.marcportabella.immichuploader.data.ApiKeyGatedImmichCatalogTransport
 import com.marcportabella.immichuploader.data.ApiKeyGatedImmichTransport
-import com.marcportabella.immichuploader.data.DryRunImmichCatalogTransport
-import com.marcportabella.immichuploader.data.DryRunImmichTransport
+import com.marcportabella.immichuploader.data.ApiImmichOnlineTransport
 import com.marcportabella.immichuploader.data.IMMICH_API_BASE_URL
 import com.marcportabella.immichuploader.data.ImmichApiRequest
 import com.marcportabella.immichuploader.data.ImmichBulkMetadataRequest
 import com.marcportabella.immichuploader.data.ImmichCatalogEntry
 import com.marcportabella.immichuploader.data.ImmichCatalogRequestBuilder
 import com.marcportabella.immichuploader.data.ImmichCatalogResult
+import com.marcportabella.immichuploader.data.ImmichOnlineCatalogTransport
 import com.marcportabella.immichuploader.data.ImmichLookupHook
 import com.marcportabella.immichuploader.data.ImmichRequestBuilder
 import com.marcportabella.immichuploader.data.ImmichRequestPlan
@@ -490,25 +490,51 @@ class ComposeAppWebTest {
     }
 
     @Test
-    fun catalogTransportBlocksWhenApiKeyMissingAndSupportsDryRunCreation() {
-        val transport = ApiKeyGatedImmichCatalogTransport(DryRunImmichCatalogTransport())
+    fun catalogTransportGateStatusFollowsApiKeyPresence() {
+        val fakeTransport = object : ImmichOnlineCatalogTransport {
+            private val albums = linkedMapOf<String, ImmichCatalogEntry>()
+            private val tags = linkedMapOf<String, ImmichCatalogEntry>()
 
-        val blocked = transport.lookupAlbums(apiKey = null)
-        assertIs<ImmichCatalogResult.BlockedMissingApiKey>(blocked)
+            override suspend fun lookupAlbums(apiKey: String): ImmichCatalogResult.Success =
+                ImmichCatalogResult.Success(
+                    request = ImmichCatalogRequestBuilder.lookupAlbums(),
+                    entries = albums.values.toList(),
+                    message = "ok"
+                )
 
-        val createdAlbum = transport.createAlbumIfMissing(apiKey = "k", name = "Family")
-        assertIs<ImmichCatalogResult.DryRunSuccess>(createdAlbum)
-        assertEquals(1, createdAlbum.entries.size)
-        assertEquals("Family", createdAlbum.entries.first().name)
+            override suspend fun lookupTags(apiKey: String): ImmichCatalogResult.Success =
+                ImmichCatalogResult.Success(
+                    request = ImmichCatalogRequestBuilder.lookupTags(),
+                    entries = tags.values.toList(),
+                    message = "ok"
+                )
 
-        val loadedAlbums = transport.lookupAlbums(apiKey = "k")
-        assertIs<ImmichCatalogResult.DryRunSuccess>(loadedAlbums)
-        assertEquals(1, loadedAlbums.entries.size)
+            override suspend fun createAlbumIfMissing(apiKey: String, name: String): ImmichCatalogResult.Success {
+                val key = name.lowercase()
+                if (albums[key] == null) {
+                    albums[key] = ImmichCatalogEntry(key, name)
+                }
+                return lookupAlbums(apiKey)
+            }
+
+            override suspend fun createTagIfMissing(apiKey: String, name: String): ImmichCatalogResult.Success {
+                val key = name.lowercase()
+                if (tags[key] == null) {
+                    tags[key] = ImmichCatalogEntry(key, name)
+                }
+                return lookupTags(apiKey)
+            }
+        }
+        val transport = ApiKeyGatedImmichCatalogTransport(fakeTransport)
+
+        assertEquals(TransportGateStatus.MissingApiKey, transport.gateStatus(null))
+        assertEquals(TransportGateStatus.MissingApiKey, transport.gateStatus("   "))
+        assertEquals(TransportGateStatus.Ready, transport.gateStatus("k"))
     }
 
     @Test
     fun uploadTransportPathSelectionAndGateFollowApiKeyPresence() {
-        val transport = ApiKeyGatedImmichTransport(DryRunImmichTransport())
+        val transport = ApiKeyGatedImmichTransport(ApiImmichOnlineTransport())
 
         assertEquals(
             UploadExecutionPath.BlockedMissingApiKey,
