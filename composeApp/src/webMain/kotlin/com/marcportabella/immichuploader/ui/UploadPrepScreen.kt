@@ -181,12 +181,6 @@ fun UploadPrepScreen(store: UploadPrepStore) {
                     )
                 }
                 item {
-                    ConnectionCard(
-                        apiKey = state.apiKey,
-                        onApiKeyChange = { store.dispatch(UploadPrepAction.SetApiKey(it)) }
-                    )
-                }
-                item {
                     QueueSelectionCard(
                         state = state,
                         onOpenFilePicker = openFilePicker,
@@ -358,12 +352,6 @@ fun UploadPrepScreen(store: UploadPrepStore) {
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     item {
-                        ConnectionCard(
-                            apiKey = state.apiKey,
-                            onApiKeyChange = { store.dispatch(UploadPrepAction.SetApiKey(it)) }
-                        )
-                    }
-                    item {
                         SelectionSidebarPane(
                             state = state,
                             selectedAssets = selectedAssets,
@@ -514,38 +502,6 @@ private fun SummaryHeaderCard(
                 SummaryPill("Execution", executionPath)
                 SummaryPill("Catalog", catalogGateStatus)
             }
-        }
-    }
-}
-
-@Composable
-private fun ConnectionCard(
-    apiKey: String,
-    onApiKeyChange: (String) -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text(
-                "Connection",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
-            )
-            Text(
-                "API key is required for catalog lookups, catalog create operations, and upload execution.",
-                style = MaterialTheme.typography.bodySmall
-            )
-            OutlinedTextField(
-                value = apiKey,
-                onValueChange = onApiKeyChange,
-                label = { Text("Immich API key") },
-                modifier = Modifier.fillMaxWidth()
-            )
         }
     }
 }
