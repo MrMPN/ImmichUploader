@@ -39,8 +39,8 @@ private external class Headers {
 }
 
 private external interface RequestInit : JsAny {
-    var method: String?
-    var headers: Headers?
+    var method: String
+    var headers: Headers
     var body: String?
 }
 
@@ -63,7 +63,9 @@ private fun createRequestInit(
     val init = jsEmptyObject().unsafeCast<RequestInit>()
     init.method = method
     init.headers = headers
-    init.body = body
+    if (body != null) {
+        init.body = body
+    }
     return init
 }
 
