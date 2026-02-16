@@ -1,8 +1,22 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
+import java.util.Properties
 
 val bootstrapConfigOutputDir = layout.buildDirectory.dir("generated/source/bootstrapConfig/webMain/kotlin")
-val bootstrapApiKey = providers.environmentVariable("IMMICH_API_KEY").orElse("")
+val localPropertiesApiKey = providers.provider {
+    val propertiesFile = rootProject.layout.projectDirectory.file("local.properties").asFile
+    if (!propertiesFile.exists()) {
+        ""
+    } else {
+        val properties = Properties()
+        propertiesFile.inputStream().use(properties::load)
+        properties.getProperty("immich.apiKey", "")
+    }
+}
+val bootstrapApiKey = providers.gradleProperty("immichApiKey")
+    .orElse(providers.environmentVariable("IMMICH_API_KEY"))
+    .orElse(localPropertiesApiKey)
+    .orElse("")
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
