@@ -9,28 +9,35 @@ class BrowserImmichApiExecutor : ImmichApiExecutor {
     @OptIn(ExperimentalWasmJsInterop::class)
     override suspend fun execute(request: ImmichApiRequest, apiKey: String): ImmichApiExecutorResult {
         logInfo("[immichuploader][http] -> ${request.method} ${request.url}")
-        val headers = Headers().apply {
-            append("x-api-key", apiKey)
-            append("Accept", "application/json")
-            if (request.body != null) {
-                append("Content-Type", "application/json")
-            }
+        logInfo("[immichuploader][http] stage=headers:init")
+        val headers = createHeaders()
+        logInfo("[immichuploader][http] stage=headers:append-api-key")
+        headers.append("x-api-key", apiKey)
+        logInfo("[immichuploader][http] stage=headers:append-accept")
+        headers.append("Accept", "application/json")
+        if (request.body != null) {
+            logInfo("[immichuploader][http] stage=headers:append-content-type")
+            headers.append("Content-Type", "application/json")
         }
 
+        logInfo("[immichuploader][http] stage=request-init:create")
         val init = createRequestInit(
             method = request.method,
             headers = headers,
             body = request.body
         )
 
+        logInfo("[immichuploader][http] stage=fetch:call")
         val responseAny = fetch(
             input = request.url,
             init = init
         ).awaitJs<JsAny?>()
+        logInfo("[immichuploader][http] stage=fetch:resolved")
         val response = requireNotNull(responseAny) {
             "fetch resolved with null response for ${request.method} ${request.url}"
         }.unsafeCast<FetchResponse>()
 
+        logInfo("[immichuploader][http] stage=response:text")
         val responseBodyAny = response.text().awaitJs<JsAny?>()
         val responseBody = responseBodyAny?.toString() ?: ""
         logInfo(
@@ -44,7 +51,7 @@ class BrowserImmichApiExecutor : ImmichApiExecutor {
     }
 }
 
-private external class Headers {
+private external interface Headers : JsAny {
     fun append(name: String, value: String)
 }
 
@@ -81,3 +88,9 @@ private fun createRequestInit(
 
 @OptIn(ExperimentalWasmJsInterop::class)
 private fun jsEmptyObject(): JsAny = js("{}")
+
+@OptIn(ExperimentalWasmJsInterop::class)
+private fun jsNewHeaders(): JsAny = js("new Headers()")
+
+@OptIn(ExperimentalWasmJsInterop::class)
+private fun createHeaders(): Headers = jsNewHeaders().unsafeCast<Headers>()
