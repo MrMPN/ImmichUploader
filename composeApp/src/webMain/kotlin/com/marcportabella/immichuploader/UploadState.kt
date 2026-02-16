@@ -31,8 +31,20 @@ data class UploadPrepState(
     val catalogMessage: String? = null,
     val dryRunPlan: ImmichRequestPlan? = null,
     val dryRunApiRequests: List<ImmichApiRequest> = emptyList(),
-    val dryRunMessage: String? = null
+    val dryRunMessage: String? = null,
+    val batchFeedback: BatchFeedback? = null
 )
+
+data class BatchFeedback(
+    val level: BatchFeedbackLevel,
+    val message: String
+)
+
+enum class BatchFeedbackLevel {
+    Error,
+    Warning,
+    Success
+}
 
 enum class CatalogUiStatus {
     Idle,
@@ -66,7 +78,9 @@ sealed interface UploadPrepAction {
         val requests: List<ImmichApiRequest>,
         val message: String
     ) : UploadPrepAction
+    data object GenerateDryRunPreview : UploadPrepAction
     data object ClearDryRunPreview : UploadPrepAction
+    data object ClearBatchFeedback : UploadPrepAction
 }
 
 fun reduceUploadPrepState(state: UploadPrepState, action: UploadPrepAction): UploadPrepState =
@@ -77,7 +91,8 @@ fun reduceUploadPrepState(state: UploadPrepState, action: UploadPrepAction): Upl
             state.copy(
                 assets = nextAssets,
                 selectedAssetIds = state.selectedAssetIds.intersect(validIds),
-                stagedEditsByAssetId = state.stagedEditsByAssetId.filterKeys { it in validIds }
+                stagedEditsByAssetId = state.stagedEditsByAssetId.filterKeys { it in validIds },
+                batchFeedback = null
             )
         }
 
@@ -87,16 +102,17 @@ fun reduceUploadPrepState(state: UploadPrepState, action: UploadPrepAction): Upl
             if (!nextSelection.add(action.assetId)) {
                 nextSelection.remove(action.assetId)
             }
-            state.copy(selectedAssetIds = nextSelection)
+            state.copy(selectedAssetIds = nextSelection, batchFeedback = null)
         }
 
         is UploadPrepAction.SetSelection -> state.copy(
-            selectedAssetIds = action.assetIds.intersect(state.assets.keys)
+            selectedAssetIds = action.assetIds.intersect(state.assets.keys),
+            batchFeedback = null
         )
 
-        UploadPrepAction.SelectAll -> state.copy(selectedAssetIds = state.assets.keys)
+        UploadPrepAction.SelectAll -> state.copy(selectedAssetIds = state.assets.keys, batchFeedback = null)
 
-        UploadPrepAction.ClearSelection -> state.copy(selectedAssetIds = emptySet())
+        UploadPrepAction.ClearSelection -> state.copy(selectedAssetIds = emptySet(), batchFeedback = null)
 
         is UploadPrepAction.StageEditForSelected ->
             stagePatchForIds(state, state.selectedAssetIds, action.patch)
@@ -106,18 +122,56 @@ fun reduceUploadPrepState(state: UploadPrepState, action: UploadPrepAction): Upl
             stagePatchForIds(state, setOf(action.assetId), action.patch)
         }
 
-        UploadPrepAction.ClearStagedForSelected -> state.copy(
-            stagedEditsByAssetId = state.stagedEditsByAssetId.filterKeys { it !in state.selectedAssetIds }
-        )
-
-        is UploadPrepAction.SetBulkEditDraft -> state.copy(bulkEditDraft = action.draft)
-
-        UploadPrepAction.ApplyBulkEditDraftToSelected -> {
-            val patch = state.bulkEditDraft.toPatch() ?: return state
-            stagePatchForIds(state, state.selectedAssetIds, patch)
+        UploadPrepAction.ClearStagedForSelected -> {
+            if (state.selectedAssetIds.isEmpty()) {
+                state.copy(
+                    batchFeedback = BatchFeedback(
+                        level = BatchFeedbackLevel.Warning,
+                        message = "No selected assets to clear."
+                    )
+                )
+            } else {
+                state.copy(
+                    stagedEditsByAssetId = state.stagedEditsByAssetId.filterKeys { it !in state.selectedAssetIds },
+                    batchFeedback = BatchFeedback(
+                        level = BatchFeedbackLevel.Success,
+                        message = "Cleared staged edits for ${state.selectedAssetIds.size} selected assets."
+                    )
+                )
+            }
         }
 
-        UploadPrepAction.ClearBulkEditDraft -> state.copy(bulkEditDraft = BulkEditDraft())
+        is UploadPrepAction.SetBulkEditDraft -> state.copy(
+            bulkEditDraft = action.draft,
+            batchFeedback = null
+        )
+
+        UploadPrepAction.ApplyBulkEditDraftToSelected -> {
+            val preflightFeedback = preflightBulkEditDraft(state)
+            if (preflightFeedback != null) {
+                state.copy(batchFeedback = preflightFeedback)
+            } else {
+                val patch = state.bulkEditDraft.toPatch()
+                    ?: return state.copy(
+                        batchFeedback = BatchFeedback(
+                            level = BatchFeedbackLevel.Warning,
+                            message = "No bulk fields selected to apply."
+                        )
+                    )
+
+                stagePatchForIds(state, state.selectedAssetIds, patch).copy(
+                    batchFeedback = BatchFeedback(
+                        level = BatchFeedbackLevel.Success,
+                        message = "Applied bulk edits to ${state.selectedAssetIds.size} selected assets."
+                    )
+                )
+            }
+        }
+
+        UploadPrepAction.ClearBulkEditDraft -> state.copy(
+            bulkEditDraft = BulkEditDraft(),
+            batchFeedback = null
+        )
 
         is UploadPrepAction.SetApiKey -> state.copy(apiKey = action.value)
 
@@ -152,14 +206,53 @@ fun reduceUploadPrepState(state: UploadPrepState, action: UploadPrepAction): Upl
         is UploadPrepAction.DryRunPreviewGenerated -> state.copy(
             dryRunPlan = action.plan,
             dryRunApiRequests = action.requests,
-            dryRunMessage = action.message
+            dryRunMessage = action.message,
+            batchFeedback = BatchFeedback(
+                level = if (action.requests.isEmpty()) BatchFeedbackLevel.Warning else BatchFeedbackLevel.Success,
+                message = action.message
+            )
         )
+
+        UploadPrepAction.GenerateDryRunPreview -> {
+            val preflightFeedback = preflightDryRun(state)
+            if (preflightFeedback != null) {
+                state.copy(
+                    dryRunPlan = null,
+                    dryRunApiRequests = emptyList(),
+                    dryRunMessage = preflightFeedback.message,
+                    batchFeedback = preflightFeedback
+                )
+            } else {
+                val plan = ImmichRequestBuilder.buildDryRunPlan(state)
+                val requests = ImmichRequestBuilder.buildPayloadInspectorRequests(plan)
+                val feedback = if (requests.isEmpty()) {
+                    BatchFeedback(
+                        level = BatchFeedbackLevel.Warning,
+                        message = "No operations planned. Select assets and/or stage edits first."
+                    )
+                } else {
+                    BatchFeedback(
+                        level = BatchFeedbackLevel.Success,
+                        message = "Dry-run generated ${requests.size} operations."
+                    )
+                }
+                state.copy(
+                    dryRunPlan = plan,
+                    dryRunApiRequests = requests,
+                    dryRunMessage = feedback.message,
+                    batchFeedback = feedback
+                )
+            }
+        }
 
         UploadPrepAction.ClearDryRunPreview -> state.copy(
             dryRunPlan = null,
             dryRunApiRequests = emptyList(),
-            dryRunMessage = null
+            dryRunMessage = null,
+            batchFeedback = null
         )
+
+        UploadPrepAction.ClearBatchFeedback -> state.copy(batchFeedback = null)
     }
 
 private fun stagePatchForIds(
@@ -209,8 +302,95 @@ private fun BulkEditDraft.toPatch(): AssetEditPatch? {
     }
 }
 
+fun preflightBulkEditDraft(state: UploadPrepState): BatchFeedback? {
+    if (state.selectedAssetIds.isEmpty()) {
+        return BatchFeedback(
+            level = BatchFeedbackLevel.Error,
+            message = "Select at least one asset before applying bulk edits."
+        )
+    }
+
+    val draft = state.bulkEditDraft
+    if (draft.includeDateTimeOriginal && draft.dateTimeOriginal.isBlank()) {
+        return BatchFeedback(
+            level = BatchFeedbackLevel.Error,
+            message = "Date/time is required when date/time edit is enabled."
+        )
+    }
+
+    if (draft.includeDateTimeOriginal && !isIsoUtcDateTime(draft.dateTimeOriginal)) {
+        return BatchFeedback(
+            level = BatchFeedbackLevel.Error,
+            message = "Date/time must use ISO 8601 UTC format: YYYY-MM-DDTHH:MM:SSZ."
+        )
+    }
+
+    val addTags = parseTagList(draft.addTagIds)
+    val removeTags = parseTagList(draft.removeTagIds)
+    val conflictingTags = addTags.intersect(removeTags)
+    if (conflictingTags.isNotEmpty()) {
+        return BatchFeedback(
+            level = BatchFeedbackLevel.Error,
+            message = "Tag IDs cannot be both added and removed: ${conflictingTags.sorted().joinToString(", ")}."
+        )
+    }
+
+    if (draft.toPatch() == null) {
+        return BatchFeedback(
+            level = BatchFeedbackLevel.Warning,
+            message = "No bulk fields selected to apply."
+        )
+    }
+
+    return null
+}
+
+fun canApplyBulkEdit(state: UploadPrepState): Boolean =
+    preflightBulkEditDraft(state) == null
+
+private fun preflightDryRun(state: UploadPrepState): BatchFeedback? {
+    if (state.selectedAssetIds.isEmpty()) {
+        return BatchFeedback(
+            level = BatchFeedbackLevel.Error,
+            message = "Select at least one asset before generating a dry-run plan."
+        )
+    }
+
+    state.selectedAssetIds.forEach { assetId ->
+        val patch = state.stagedEditsByAssetId[assetId] ?: return@forEach
+        val dateTime = (patch.dateTimeOriginal as? FieldPatch.Set<String>)?.value ?: return@forEach
+        if (!isIsoUtcDateTime(dateTime)) {
+            return BatchFeedback(
+                level = BatchFeedbackLevel.Error,
+                message = "One or more staged date/time values are invalid. Use YYYY-MM-DDTHH:MM:SSZ."
+            )
+        }
+    }
+
+    return null
+}
+
 private fun parseTagList(value: String): Set<String> =
     value.split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+
+private fun isIsoUtcDateTime(value: String): Boolean {
+    val isoUtcRegex = Regex("""^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$""")
+    if (!isoUtcRegex.matches(value)) return false
+
+    val year = value.substring(0, 4).toIntOrNull() ?: return false
+    val month = value.substring(5, 7).toIntOrNull() ?: return false
+    val day = value.substring(8, 10).toIntOrNull() ?: return false
+    val hour = value.substring(11, 13).toIntOrNull() ?: return false
+    val minute = value.substring(14, 16).toIntOrNull() ?: return false
+    val second = value.substring(17, 19).toIntOrNull() ?: return false
+
+    return year >= 1900 &&
+        month in 1..12 &&
+        day in 1..31 &&
+        hour in 0..23 &&
+        minute in 0..59 &&
+        second in 0..59
+}
 
 class UploadPrepStore(initialState: UploadPrepState = UploadPrepState()) {
     var state by mutableStateOf(initialState)

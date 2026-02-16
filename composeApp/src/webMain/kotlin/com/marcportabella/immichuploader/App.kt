@@ -72,6 +72,7 @@ fun App() {
         val gateStatus = transport.gateStatus(apiKey = state.apiKey.ifBlank { null })
         val catalogTransport = remember { ApiKeyGatedImmichCatalogTransport(DryRunImmichCatalogTransport()) }
         val catalogGateStatus = catalogTransport.gateStatus(state.apiKey.ifBlank { null })
+        val bulkPreflightFeedback = preflightBulkEditDraft(state)
 
         Column(
             modifier = Modifier
@@ -186,31 +187,25 @@ fun App() {
             BulkEditSection(
                 draft = state.bulkEditDraft,
                 selectedCount = state.selectedAssetIds.size,
+                applyEnabled = canApplyBulkEdit(state),
+                preflightMessage = bulkPreflightFeedback?.message,
                 onDraftChange = { store.dispatch(UploadPrepAction.SetBulkEditDraft(it)) },
                 onApply = { store.dispatch(UploadPrepAction.ApplyBulkEditDraftToSelected) },
                 onClearDraft = { store.dispatch(UploadPrepAction.ClearBulkEditDraft) },
                 onClearSelectedStaged = { store.dispatch(UploadPrepAction.ClearStagedForSelected) }
             )
 
+            if (state.batchFeedback != null) {
+                BatchFeedbackBanner(
+                    feedback = state.batchFeedback,
+                    onDismiss = { store.dispatch(UploadPrepAction.ClearBatchFeedback) }
+                )
+            }
+
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
-                    onClick = {
-                        val plan = ImmichRequestBuilder.buildDryRunPlan(state)
-                        val requests = ImmichRequestBuilder.buildPayloadInspectorRequests(plan)
-                        val message = if (requests.isEmpty()) {
-                            "No operations planned. Select assets and/or stage edits first."
-                        } else {
-                            "Dry-run generated ${requests.size} operations."
-                        }
-                        store.dispatch(
-                            UploadPrepAction.DryRunPreviewGenerated(
-                                plan = plan,
-                                requests = requests,
-                                message = message
-                            )
-                        )
-                    },
-                    enabled = state.assets.isNotEmpty()
+                    onClick = { store.dispatch(UploadPrepAction.GenerateDryRunPreview) },
+                    enabled = state.selectedAssetIds.isNotEmpty()
                 ) {
                     Text("Generate dry-run plan")
                 }
@@ -370,6 +365,8 @@ private fun CatalogSection(
 private fun BulkEditSection(
     draft: BulkEditDraft,
     selectedCount: Int,
+    applyEnabled: Boolean,
+    preflightMessage: String?,
     onDraftChange: (BulkEditDraft) -> Unit,
     onApply: () -> Unit,
     onClearDraft: () -> Unit,
@@ -453,8 +450,12 @@ private fun BulkEditSection(
         modifier = Modifier.fillMaxWidth()
     )
 
+    if (preflightMessage != null) {
+        Text(preflightMessage)
+    }
+
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Button(onClick = onApply, enabled = selectedCount > 0) {
+        Button(onClick = onApply, enabled = applyEnabled) {
             Text("Apply to selected")
         }
         Button(onClick = onClearDraft) {
@@ -466,6 +467,40 @@ private fun BulkEditSection(
     }
 
     Text("Timezone is shown per asset as read-only metadata.")
+}
+
+@Composable
+private fun BatchFeedbackBanner(
+    feedback: BatchFeedback,
+    onDismiss: () -> Unit
+) {
+    val colorScheme = MaterialTheme.colorScheme
+    val containerColor = when (feedback.level) {
+        BatchFeedbackLevel.Error -> colorScheme.errorContainer
+        BatchFeedbackLevel.Warning -> colorScheme.secondaryContainer
+        BatchFeedbackLevel.Success -> colorScheme.tertiaryContainer
+    }
+    val contentColor = when (feedback.level) {
+        BatchFeedbackLevel.Error -> colorScheme.onErrorContainer
+        BatchFeedbackLevel.Warning -> colorScheme.onSecondaryContainer
+        BatchFeedbackLevel.Success -> colorScheme.onTertiaryContainer
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(containerColor)
+            .padding(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            text = feedback.message,
+            color = contentColor
+        )
+        Button(onClick = onDismiss) {
+            Text("Dismiss")
+        }
+    }
 }
 
 data class DisplayMetadata(

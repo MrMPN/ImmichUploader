@@ -2,6 +2,7 @@ package com.marcportabella.immichuploader
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -111,6 +112,115 @@ class ComposeAppWebTest {
         assertEquals(setOf("tag-a", "tag-b"), patchC.addTagIds)
 
         assertNull(next.stagedEditsByAssetId[b])
+    }
+
+    @Test
+    fun bulkDraftValidationBlocksApplyWhenSelectionMissing() {
+        val next = reduceUploadPrepState(
+            UploadPrepState(
+                bulkEditDraft = BulkEditDraft(includeFavorite = true, isFavorite = true)
+            ),
+            UploadPrepAction.ApplyBulkEditDraftToSelected
+        )
+
+        assertTrue(next.stagedEditsByAssetId.isEmpty())
+        assertEquals(BatchFeedbackLevel.Error, next.batchFeedback?.level)
+        assertEquals("Select at least one asset before applying bulk edits.", next.batchFeedback?.message)
+        assertFalse(canApplyBulkEdit(next))
+    }
+
+    @Test
+    fun bulkDraftValidationBlocksMalformedDateTime() {
+        val id = LocalAssetId("a")
+        val next = reduceUploadPrepState(
+            UploadPrepState(
+                assets = mapOf(id to LocalAsset(id, "a.jpg", "image/jpeg", 1, null, null, null)),
+                selectedAssetIds = setOf(id),
+                bulkEditDraft = BulkEditDraft(
+                    includeDateTimeOriginal = true,
+                    dateTimeOriginal = "2026/01/01 00:00:00"
+                )
+            ),
+            UploadPrepAction.ApplyBulkEditDraftToSelected
+        )
+
+        assertNull(next.stagedEditsByAssetId[id])
+        assertEquals(BatchFeedbackLevel.Error, next.batchFeedback?.level)
+        assertEquals(
+            "Date/time must use ISO 8601 UTC format: YYYY-MM-DDTHH:MM:SSZ.",
+            next.batchFeedback?.message
+        )
+    }
+
+    @Test
+    fun bulkDraftValidationBlocksConflictingTagOperations() {
+        val id = LocalAssetId("a")
+        val next = reduceUploadPrepState(
+            UploadPrepState(
+                assets = mapOf(id to LocalAsset(id, "a.jpg", "image/jpeg", 1, null, null, null)),
+                selectedAssetIds = setOf(id),
+                bulkEditDraft = BulkEditDraft(
+                    addTagIds = "tag-1,tag-2",
+                    removeTagIds = "tag-2"
+                )
+            ),
+            UploadPrepAction.ApplyBulkEditDraftToSelected
+        )
+
+        assertNull(next.stagedEditsByAssetId[id])
+        assertEquals(BatchFeedbackLevel.Error, next.batchFeedback?.level)
+        assertEquals(
+            "Tag IDs cannot be both added and removed: tag-2.",
+            next.batchFeedback?.message
+        )
+    }
+
+    @Test
+    fun dryRunPreflightRequiresSelectionAndValidStagedDateTime() {
+        val emptySelection = reduceUploadPrepState(
+            UploadPrepState(),
+            UploadPrepAction.GenerateDryRunPreview
+        )
+        assertEquals(BatchFeedbackLevel.Error, emptySelection.batchFeedback?.level)
+        assertEquals(
+            "Select at least one asset before generating a dry-run plan.",
+            emptySelection.batchFeedback?.message
+        )
+
+        val id = LocalAssetId("a")
+        val invalidDate = reduceUploadPrepState(
+            UploadPrepState(
+                assets = mapOf(id to LocalAsset(id, "a.jpg", "image/jpeg", 1, null, null, null)),
+                selectedAssetIds = setOf(id),
+                stagedEditsByAssetId = mapOf(
+                    id to AssetEditPatch(dateTimeOriginal = FieldPatch.Set("not-a-date"))
+                )
+            ),
+            UploadPrepAction.GenerateDryRunPreview
+        )
+
+        assertEquals(BatchFeedbackLevel.Error, invalidDate.batchFeedback?.level)
+        assertEquals(
+            "One or more staged date/time values are invalid. Use YYYY-MM-DDTHH:MM:SSZ.",
+            invalidDate.batchFeedback?.message
+        )
+        assertNull(invalidDate.dryRunPlan)
+    }
+
+    @Test
+    fun dryRunGenerationSetsSuccessFeedback() {
+        val id = LocalAssetId("a")
+        val next = reduceUploadPrepState(
+            UploadPrepState(
+                assets = mapOf(id to LocalAsset(id, "a.jpg", "image/jpeg", 1, null, null, null)),
+                selectedAssetIds = setOf(id)
+            ),
+            UploadPrepAction.GenerateDryRunPreview
+        )
+
+        assertNotNull(next.dryRunPlan)
+        assertTrue(next.dryRunApiRequests.isNotEmpty())
+        assertEquals(BatchFeedbackLevel.Success, next.batchFeedback?.level)
     }
 
     @Test
