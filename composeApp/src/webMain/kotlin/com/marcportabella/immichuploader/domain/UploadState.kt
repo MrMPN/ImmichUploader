@@ -589,12 +589,28 @@ private fun parseTiffExif(
             ifdOffset = it
         )
     }
+    val gpsIfdOffset = ifd0.pointers[GPS_INFO_POINTER_TAG]
+    val gpsIfd = gpsIfdOffset?.let {
+        parseIfd(
+            bytes = bytes,
+            reader = reader,
+            tiffStart = tiffStart,
+            tiffLength = tiffLength,
+            ifdOffset = it
+        )
+    }
 
     val dateTimeOriginalRaw = exifIfd?.values?.get(DATE_TIME_ORIGINAL_TAG) ?: ifd0.values[DATE_TIME_TAG]
     val timezoneRawFromOffsetTags =
         exifIfd?.values?.get(OFFSET_TIME_ORIGINAL_TAG) ?: exifIfd?.values?.get(OFFSET_TIME_TAG)
     val timezoneRawFromTimeZoneOffsetTag =
         exifIfd?.values?.get(TIME_ZONE_OFFSET_TAG) ?: ifd0.values[TIME_ZONE_OFFSET_TAG]
+    val timezoneRawFromGps =
+        inferTimeZoneOffsetFromGps(
+            dateTimeOriginal = dateTimeOriginalRaw,
+            gpsDateStamp = gpsIfd?.values?.get(GPS_DATE_STAMP_TAG),
+            gpsTimeStamp = gpsIfd?.values?.get(GPS_TIME_STAMP_TAG)
+        )
     val cameraMake = ifd0.values[MAKE_TAG]
     val cameraModel = ifd0.values[MODEL_TAG]
     val parsedDateTimeOriginal = dateTimeOriginalRaw?.let(::parseExifDateTimeAndOffset)
@@ -607,11 +623,14 @@ private fun parseTiffExif(
     exifIfd?.values?.get(F_NUMBER_TAG)?.let { metadata["fNumber"] = it }
     exifIfd?.values?.get(FOCAL_LENGTH_TAG)?.let { metadata["focalLengthMm"] = it }
     ifd0.values[SOFTWARE_TAG]?.let { metadata["software"] = it }
+    gpsIfd?.values?.get(GPS_DATE_STAMP_TAG)?.let { metadata["gpsDateStamp"] = it }
+    gpsIfd?.values?.get(GPS_TIME_STAMP_TAG)?.let { metadata["gpsTimeStamp"] = it }
 
     val hasUsefulData =
         dateTimeOriginalRaw != null ||
             timezoneRawFromOffsetTags != null ||
             timezoneRawFromTimeZoneOffsetTag != null ||
+            timezoneRawFromGps != null ||
             parsedDateTimeOriginal?.second != null ||
             cameraMake != null ||
             cameraModel != null ||
@@ -624,6 +643,7 @@ private fun parseTiffExif(
         timeZone = timezoneRawFromOffsetTags?.let(::normalizeTimeZoneOffset)
             ?: timezoneRawFromTimeZoneOffsetTag?.let(::normalizeTimeZoneOffsetHours)
             ?: parsedDateTimeOriginal?.second
+            ?: timezoneRawFromGps
             ?: timezoneRawFromOffsetTags
             ?: timezoneRawFromTimeZoneOffsetTag,
         cameraMake = cameraMake,
@@ -729,10 +749,15 @@ private fun readExifValueAsString(
         }
 
         EXIF_TYPE_RATIONAL -> {
-            val numerator = reader.u32(valueOffset) ?: return null
-            val denominator = reader.u32(valueOffset + 4) ?: return null
-            if (denominator == 0) return null
-            formatRationalValue(numerator, denominator)
+            if (count <= 0) return null
+            val values = (0 until count).mapNotNull { index ->
+                val componentOffset = valueOffset + (index * 8)
+                val numerator = reader.u32(componentOffset) ?: return@mapNotNull null
+                val denominator = reader.u32(componentOffset + 4) ?: return@mapNotNull null
+                if (denominator == 0) return@mapNotNull null
+                formatRationalValue(numerator, denominator)
+            }
+            values.takeIf { it.isNotEmpty() }?.joinToString(":")
         }
 
         else -> null
@@ -801,6 +826,73 @@ private fun normalizeTimeZoneOffsetHours(value: String): String? {
     return "$sign$hh:00"
 }
 
+private fun inferTimeZoneOffsetFromGps(
+    dateTimeOriginal: String?,
+    gpsDateStamp: String?,
+    gpsTimeStamp: String?
+): String? {
+    val local = parseExifDateTimeAndOffset(dateTimeOriginal ?: return null)?.first ?: return null
+    val localParts = parseDateTimeParts(local) ?: return null
+    val gpsParts = parseGpsUtcDateTime(gpsDateStamp ?: return null, gpsTimeStamp ?: return null) ?: return null
+
+    val localMinutes = toApproximateEpochMinutes(localParts)
+    val gpsMinutes = toApproximateEpochMinutes(gpsParts)
+    var diff = localMinutes - gpsMinutes
+
+    while (diff < -14 * 60) diff += 24 * 60
+    while (diff > 14 * 60) diff -= 24 * 60
+    if (diff !in (-14 * 60)..(14 * 60)) return null
+
+    val sign = if (diff >= 0) "+" else "-"
+    val absMinutes = kotlin.math.abs(diff)
+    val hours = (absMinutes / 60).toString().padStart(2, '0')
+    val minutes = (absMinutes % 60).toString().padStart(2, '0')
+    return "$sign$hours:$minutes"
+}
+
+private data class DateTimeParts(
+    val year: Int,
+    val month: Int,
+    val day: Int,
+    val hour: Int,
+    val minute: Int
+)
+
+private fun parseDateTimeParts(value: String): DateTimeParts? {
+    val match = Regex("""^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):\d{2}$""").matchEntire(value) ?: return null
+    return DateTimeParts(
+        year = match.groupValues[1].toIntOrNull() ?: return null,
+        month = match.groupValues[2].toIntOrNull() ?: return null,
+        day = match.groupValues[3].toIntOrNull() ?: return null,
+        hour = match.groupValues[4].toIntOrNull() ?: return null,
+        minute = match.groupValues[5].toIntOrNull() ?: return null
+    )
+}
+
+private fun parseGpsUtcDateTime(dateStamp: String, timeStamp: String): DateTimeParts? {
+    val date = Regex("""^(\d{4})[:\-](\d{2})[:\-](\d{2})$""").matchEntire(dateStamp.trim()) ?: return null
+    val parts = timeStamp.split(':')
+    if (parts.size < 2) return null
+    val hour = parts[0].substringBefore('/').toIntOrNull() ?: return null
+    val minute = parts[1].substringBefore('/').toIntOrNull() ?: return null
+    return DateTimeParts(
+        year = date.groupValues[1].toIntOrNull() ?: return null,
+        month = date.groupValues[2].toIntOrNull() ?: return null,
+        day = date.groupValues[3].toIntOrNull() ?: return null,
+        hour = hour,
+        minute = minute
+    )
+}
+
+private fun toApproximateEpochMinutes(parts: DateTimeParts): Int {
+    val monthDays = intArrayOf(31, if (isLeapYear(parts.year)) 29 else 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
+    val dayOfYear = monthDays.take(parts.month - 1).sum() + parts.day
+    return (((parts.year * 366) + dayOfYear) * 24 + parts.hour) * 60 + parts.minute
+}
+
+private fun isLeapYear(year: Int): Boolean =
+    (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)
+
 private fun normalizeTimeZoneOffset(value: String): String? {
     val trimmed = value.trim()
     if (trimmed == "Z") return "Z"
@@ -866,6 +958,8 @@ private const val DATE_TIME_DIGITIZED_TAG = 0x9004
 private const val OFFSET_TIME_TAG = 0x9010
 private const val OFFSET_TIME_ORIGINAL_TAG = 0x9011
 private const val TIME_ZONE_OFFSET_TAG = 0x882A
+private const val GPS_TIME_STAMP_TAG = 0x0007
+private const val GPS_DATE_STAMP_TAG = 0x001D
 private const val ISO_SPEED_TAG = 0x8827
 private const val EXPOSURE_TIME_TAG = 0x829A
 private const val F_NUMBER_TAG = 0x829D
