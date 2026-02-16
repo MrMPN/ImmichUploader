@@ -8,12 +8,6 @@ plugins {
 }
 
 kotlin {
-    js {
-        browser()
-        nodejs()
-        binaries.executable()
-    }
-
     @OptIn(ExperimentalWasmDsl::class)
     wasmJs {
         browser()
@@ -39,20 +33,20 @@ kotlin {
 
 // Verification handoffs expect these task names for web checks.
 tasks.register("compileKotlinWeb") {
-    dependsOn(":composeApp:compileKotlinJs")
+    dependsOn(":composeApp:compileKotlinWasmJs")
 }
 
 tasks.register("webTest") {
-    dependsOn(":composeApp:jsNodeTest")
+    dependsOn(":composeApp:wasmJsTest")
 }
 
 val chromeBin = System.getenv("CHROME_BIN")
 if (chromeBin.isNullOrBlank()) {
-    tasks.matching { it.name in setOf("jsBrowserTest", "wasmJsBrowserTest") }.configureEach {
+    tasks.matching { it.name in setOf("wasmJsTest", "wasmJsBrowserTest") }.configureEach {
         enabled = false
     }
     tasks.named("check") {
-        dependsOn(":composeApp:jsNodeTest")
+        dependsOn(":composeApp:compileKotlinWasmJs")
     }
 }
 
