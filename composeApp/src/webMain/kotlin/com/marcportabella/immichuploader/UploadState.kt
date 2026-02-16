@@ -84,3 +84,27 @@ class UploadPrepStore(initialState: UploadPrepState = UploadPrepState()) {
         state = reduceUploadPrepState(state, action)
     }
 }
+
+data class LocalIntakeFile(
+    val name: String,
+    val type: String,
+    val size: Long,
+    val lastModifiedEpochMillis: Long,
+    val previewUrl: String?
+)
+
+fun mapLocalIntakeFilesToAssets(files: List<LocalIntakeFile>): List<LocalAsset> =
+    files.mapIndexed { index, file ->
+        val normalizedType = file.type.ifBlank { "application/octet-stream" }
+        LocalAsset(
+            id = LocalAssetId(
+                "local-${file.name}-${file.size}-${file.lastModifiedEpochMillis}-$index"
+            ),
+            fileName = file.name,
+            mimeType = normalizedType,
+            fileSizeBytes = file.size,
+            previewUrl = file.previewUrl,
+            captureDateTime = null,
+            timeZone = null
+        )
+    }

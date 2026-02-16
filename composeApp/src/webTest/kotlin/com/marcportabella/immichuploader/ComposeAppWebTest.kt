@@ -14,8 +14,8 @@ class ComposeAppWebTest {
         val b = LocalAssetId("b")
         val initial = UploadPrepState(
             assets = mapOf(
-                a to LocalAsset(a, "a.jpg", "image/jpeg", 1, null, null),
-                b to LocalAsset(b, "b.jpg", "image/jpeg", 2, null, null)
+                a to LocalAsset(a, "a.jpg", "image/jpeg", 1, null, null, null),
+                b to LocalAsset(b, "b.jpg", "image/jpeg", 2, null, null, null)
             ),
             selectedAssetIds = setOf(a)
         )
@@ -35,7 +35,7 @@ class ComposeAppWebTest {
     fun stagedEditsMergeNonDestructively() {
         val id = LocalAssetId("a")
         val initial = UploadPrepState(
-            assets = mapOf(id to LocalAsset(id, "a.jpg", "image/jpeg", 1, null, null)),
+            assets = mapOf(id to LocalAsset(id, "a.jpg", "image/jpeg", 1, null, null, null)),
             selectedAssetIds = setOf(id),
             stagedEditsByAssetId = mapOf(
                 id to AssetEditPatch(description = FieldPatch.Set("original"))
@@ -113,5 +113,35 @@ class ComposeAppWebTest {
         assertTrue(hooks[1] is ImmichLookupHook.LookupTags)
         assertTrue(hooks[2] is ImmichLookupHook.CreateAlbumIfMissing)
         assertTrue(hooks[3] is ImmichLookupHook.CreateTagIfMissing)
+    }
+
+    @Test
+    fun localIntakeMapperBuildsAssetsWithPreviewMetadata() {
+        val assets = mapLocalIntakeFilesToAssets(
+            listOf(
+                LocalIntakeFile(
+                    name = "photo.jpg",
+                    type = "image/jpeg",
+                    size = 123,
+                    lastModifiedEpochMillis = 1_700_000_000_000,
+                    previewUrl = "blob:preview-1"
+                ),
+                LocalIntakeFile(
+                    name = "unknown.bin",
+                    type = "",
+                    size = 99,
+                    lastModifiedEpochMillis = 1_700_000_000_100,
+                    previewUrl = null
+                )
+            )
+        )
+
+        assertEquals(2, assets.size)
+        assertEquals("photo.jpg", assets[0].fileName)
+        assertEquals("image/jpeg", assets[0].mimeType)
+        assertEquals("blob:preview-1", assets[0].previewUrl)
+        assertEquals("application/octet-stream", assets[1].mimeType)
+        assertNull(assets[1].previewUrl)
+        assertTrue(assets[0].id.value.startsWith("local-photo.jpg-123-"))
     }
 }

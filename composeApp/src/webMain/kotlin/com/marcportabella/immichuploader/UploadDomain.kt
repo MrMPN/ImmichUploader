@@ -10,6 +10,7 @@ data class LocalAsset(
     val fileName: String,
     val mimeType: String,
     val fileSizeBytes: Long,
+    val previewUrl: String?,
     val captureDateTime: String?,
     val timeZone: String?
 )
