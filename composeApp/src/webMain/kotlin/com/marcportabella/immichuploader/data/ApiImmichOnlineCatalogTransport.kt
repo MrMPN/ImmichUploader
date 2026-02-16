@@ -89,6 +89,9 @@ class ApiImmichOnlineCatalogTransport(
             .fold(
                 onSuccess = { ExecutionAttempt(result = it, errorMessage = null) },
                 onFailure = { throwable ->
+                    catalogConsole.error(
+                        "[immichuploader][catalog] request failed: ${request.method} ${request.url} error=${throwable.message ?: throwable}"
+                    )
                     ExecutionAttempt(
                         result = null,
                         errorMessage = throwable.message ?: throwable.toString()
@@ -98,6 +101,9 @@ class ApiImmichOnlineCatalogTransport(
 
     private fun parseAlbumEntries(responseBody: String): List<ImmichCatalogEntry> =
         runCatching { immichJson.decodeFromString<List<ImmichAlbumResponse>>(responseBody) }
+            .onFailure { throwable ->
+                catalogConsole.error("[immichuploader][catalog] album decode failed: ${throwable.message ?: throwable}")
+            }
             .getOrDefault(emptyList())
             .mapNotNull { album ->
                 val name = album.albumName ?: album.name ?: return@mapNotNull null
@@ -108,6 +114,9 @@ class ApiImmichOnlineCatalogTransport(
 
     private fun parseTagEntries(responseBody: String): List<ImmichCatalogEntry> =
         runCatching { immichJson.decodeFromString<List<ImmichTagResponse>>(responseBody) }
+            .onFailure { throwable ->
+                catalogConsole.error("[immichuploader][catalog] tag decode failed: ${throwable.message ?: throwable}")
+            }
             .getOrDefault(emptyList())
             .mapNotNull { tag ->
                 val name = tag.value ?: tag.name ?: return@mapNotNull null
@@ -135,3 +144,7 @@ private data class ImmichTagResponse(
     val name: String? = null,
     val value: String? = null
 )
+
+private external object catalogConsole {
+    fun error(message: String)
+}
