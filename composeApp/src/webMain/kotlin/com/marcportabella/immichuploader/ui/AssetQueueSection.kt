@@ -81,7 +81,7 @@ fun LazyListScope.assetQueueSection(
     }
 }
 
-private const val ENABLE_QUEUE_PREVIEWS = false
+private const val ENABLE_QUEUE_PREVIEWS = true
 
 @Composable
 private fun AssetQueueRow(
