@@ -10,13 +10,17 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,6 +44,8 @@ fun AssetQueueSection(
         state.assets.values.sortedBy { it.fileName }
     }
     val thumbnailCache = remember { mutableMapOf<LocalAssetId, ImageBitmap?>() }
+    var visibleCount by remember(sortedAssets.size) { mutableStateOf(minOf(sortedAssets.size, 40)) }
+    val visibleAssets = remember(sortedAssets, visibleCount) { sortedAssets.take(visibleCount) }
 
     Card(
         modifier = Modifier
@@ -61,7 +67,7 @@ fun AssetQueueSection(
                 Text("No files selected yet.")
             } else {
                 Text("Sorted by filename for predictable review.")
-                sortedAssets.forEach { asset ->
+                visibleAssets.forEach { asset ->
                     val patch = state.stagedEditsByAssetId[asset.id]
                     val metadata = asset.toDisplayMetadata(patch)
                     Card(
@@ -112,6 +118,12 @@ fun AssetQueueSection(
                                 }
                             }
                         }
+                    }
+                }
+
+                if (visibleCount < sortedAssets.size) {
+                    Button(onClick = { visibleCount = minOf(sortedAssets.size, visibleCount + 40) }) {
+                        Text("Show more (${sortedAssets.size - visibleCount} remaining)")
                     }
                 }
             }
