@@ -12,7 +12,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -78,31 +77,21 @@ fun BulkEditSection(
                 )
             }
 
-            if (availableAlbums.isNotEmpty()) {
-                Text("Choose album", style = MaterialTheme.typography.labelMedium)
-                FlowRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    availableAlbums.forEach { album ->
-                        val selected = draft.includeAlbumId && draft.albumId == album.id
-                        FilterChip(
-                            selected = selected,
-                            onClick = {
-                                onDraftChange(
-                                    if (selected) {
-                                        draft.copy(includeAlbumId = false, albumId = "")
-                                    } else {
-                                        draft.copy(includeAlbumId = true, albumId = album.id)
-                                    }
-                                )
-                            },
-                            label = { Text(album.name) }
-                        )
-                    }
+            SelectableChipGroup(
+                title = "Choose album",
+                options = availableAlbums.map { ChipOption(id = it.id, label = it.name) },
+                selectedIds = if (draft.includeAlbumId && draft.albumId.isNotBlank()) setOf(draft.albumId) else emptySet(),
+                onToggle = { albumId ->
+                    val selected = draft.includeAlbumId && draft.albumId == albumId
+                    onDraftChange(
+                        if (selected) {
+                            draft.copy(includeAlbumId = false, albumId = "")
+                        } else {
+                            draft.copy(includeAlbumId = true, albumId = albumId)
+                        }
+                    )
                 }
-            }
+            )
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -172,26 +161,16 @@ fun BulkEditSection(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            if (availableTags.isNotEmpty()) {
-                Text("Select tags to add", style = MaterialTheme.typography.labelMedium)
-                FlowRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    availableTags.forEach { tag ->
-                        val selected = tag.id in selectedTagIds
-                        FilterChip(
-                            selected = selected,
-                            onClick = {
-                                val next = if (selected) selectedTagIds - tag.id else selectedTagIds + tag.id
-                                onDraftChange(draft.copy(addTagIds = next.sorted().joinToString(",")))
-                            },
-                            label = { Text(tag.name) }
-                        )
-                    }
+            SelectableChipGroup(
+                title = "Select tags to add",
+                options = availableTags.map { ChipOption(id = it.id, label = it.name) },
+                selectedIds = selectedTagIds,
+                onToggle = { tagId ->
+                    val selected = tagId in selectedTagIds
+                    val next = if (selected) selectedTagIds - tagId else selectedTagIds + tagId
+                    onDraftChange(draft.copy(addTagIds = next.sorted().joinToString(",")))
                 }
-            }
+            )
 
             OutlinedTextField(
                 value = draft.removeTagIds,
