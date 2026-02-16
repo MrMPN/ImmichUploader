@@ -591,10 +591,13 @@ private fun parseTiffExif(
     }
 
     val dateTimeOriginalRaw = exifIfd?.values?.get(DATE_TIME_ORIGINAL_TAG) ?: ifd0.values[DATE_TIME_TAG]
-    val timezoneRaw =
+    val timezoneRawFromOffsetTags =
         exifIfd?.values?.get(OFFSET_TIME_ORIGINAL_TAG) ?: exifIfd?.values?.get(OFFSET_TIME_TAG)
+    val timezoneRawFromTimeZoneOffsetTag =
+        exifIfd?.values?.get(TIME_ZONE_OFFSET_TAG) ?: ifd0.values[TIME_ZONE_OFFSET_TAG]
     val cameraMake = ifd0.values[MAKE_TAG]
     val cameraModel = ifd0.values[MODEL_TAG]
+    val parsedDateTimeOriginal = dateTimeOriginalRaw?.let(::parseExifDateTimeAndOffset)
 
     val metadata = linkedMapOf<String, String>()
     exifIfd?.values?.get(DATE_TIME_DIGITIZED_TAG)?.let { metadata["dateTimeDigitized"] = normalizeExifDateTime(it) ?: it }
@@ -607,7 +610,9 @@ private fun parseTiffExif(
 
     val hasUsefulData =
         dateTimeOriginalRaw != null ||
-            timezoneRaw != null ||
+            timezoneRawFromOffsetTags != null ||
+            timezoneRawFromTimeZoneOffsetTag != null ||
+            parsedDateTimeOriginal?.second != null ||
             cameraMake != null ||
             cameraModel != null ||
             metadata.isNotEmpty()
@@ -615,8 +620,12 @@ private fun parseTiffExif(
     if (!hasUsefulData) return null
 
     return ParsedExifMetadata(
-        captureDateTime = dateTimeOriginalRaw?.let(::normalizeExifDateTime) ?: dateTimeOriginalRaw,
-        timeZone = timezoneRaw?.let(::normalizeTimeZoneOffset) ?: timezoneRaw,
+        captureDateTime = parsedDateTimeOriginal?.first ?: dateTimeOriginalRaw?.let(::normalizeExifDateTime) ?: dateTimeOriginalRaw,
+        timeZone = timezoneRawFromOffsetTags?.let(::normalizeTimeZoneOffset)
+            ?: timezoneRawFromTimeZoneOffsetTag?.let(::normalizeTimeZoneOffsetHours)
+            ?: parsedDateTimeOriginal?.second
+            ?: timezoneRawFromOffsetTags
+            ?: timezoneRawFromTimeZoneOffsetTag,
         cameraMake = cameraMake,
         cameraModel = cameraModel,
         metadata = metadata
@@ -709,6 +718,11 @@ private fun readExifValueAsString(
             value.toString()
         }
 
+        EXIF_TYPE_SSHORT -> {
+            val value = reader.s16(valueOffset) ?: return null
+            value.toString()
+        }
+
         EXIF_TYPE_LONG -> {
             val value = reader.u32(valueOffset) ?: return null
             value.toString()
@@ -739,6 +753,7 @@ private fun exifTypeSize(type: Int): Int? =
     when (type) {
         EXIF_TYPE_ASCII -> 1
         EXIF_TYPE_SHORT -> 2
+        EXIF_TYPE_SSHORT -> 2
         EXIF_TYPE_LONG -> 4
         EXIF_TYPE_RATIONAL -> 8
         else -> null
@@ -764,6 +779,26 @@ private fun normalizeExifDateTime(value: String): String? {
 
     return "${match.groupValues[1]}-${match.groupValues[2]}-${match.groupValues[3]}T" +
         "${match.groupValues[4]}:${match.groupValues[5]}:${match.groupValues[6]}"
+}
+
+private fun parseExifDateTimeAndOffset(value: String): Pair<String, String?>? {
+    val trimmed = value.trim()
+    val match = Regex(
+        """^(\d{4})[:\-](\d{2})[:\-](\d{2})[ T](\d{2}):(\d{2}):(\d{2})(?:\s*(Z|[+-]\d{2}:?\d{2}))?$"""
+    ).matchEntire(trimmed) ?: return null
+
+    val normalizedDateTime = "${match.groupValues[1]}-${match.groupValues[2]}-${match.groupValues[3]}T" +
+        "${match.groupValues[4]}:${match.groupValues[5]}:${match.groupValues[6]}"
+    val rawOffset = match.groupValues[7].ifBlank { null }
+    return normalizedDateTime to rawOffset?.let(::normalizeTimeZoneOffset)
+}
+
+private fun normalizeTimeZoneOffsetHours(value: String): String? {
+    val hours = value.trim().toIntOrNull() ?: return null
+    if (hours !in -23..23) return null
+    val sign = if (hours >= 0) "+" else "-"
+    val hh = kotlin.math.abs(hours).toString().padStart(2, '0')
+    return "$sign$hh:00"
 }
 
 private fun normalizeTimeZoneOffset(value: String): String? {
@@ -810,6 +845,11 @@ private class ExifReader(
             (a shl 24) or (b shl 16) or (c shl 8) or d
         }
     }
+
+    fun s16(offset: Int): Int? {
+        val unsigned = u16(offset) ?: return null
+        return if (unsigned and 0x8000 != 0) unsigned - 0x10000 else unsigned
+    }
 }
 
 private fun Byte.u8(): Int = toInt() and 0xFF
@@ -825,6 +865,7 @@ private const val DATE_TIME_ORIGINAL_TAG = 0x9003
 private const val DATE_TIME_DIGITIZED_TAG = 0x9004
 private const val OFFSET_TIME_TAG = 0x9010
 private const val OFFSET_TIME_ORIGINAL_TAG = 0x9011
+private const val TIME_ZONE_OFFSET_TAG = 0x882A
 private const val ISO_SPEED_TAG = 0x8827
 private const val EXPOSURE_TIME_TAG = 0x829A
 private const val F_NUMBER_TAG = 0x829D
@@ -833,5 +874,6 @@ private const val LENS_MODEL_TAG = 0xA434
 
 private const val EXIF_TYPE_ASCII = 2
 private const val EXIF_TYPE_SHORT = 3
+private const val EXIF_TYPE_SSHORT = 8
 private const val EXIF_TYPE_LONG = 4
 private const val EXIF_TYPE_RATIONAL = 5

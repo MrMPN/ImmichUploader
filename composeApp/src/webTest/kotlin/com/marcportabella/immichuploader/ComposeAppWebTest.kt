@@ -647,6 +647,44 @@ class ComposeAppWebTest {
     }
 
     @Test
+    fun jpegExifParserExtractsTimezoneFromDateTimeOriginalOffsetSuffix() {
+        val jpegBytes = buildJpegWithExif(
+            entries = listOf(
+                exifAsciiEntry(MAKE_TAG, "Sony"),
+                exifLongEntry(EXIF_IFD_POINTER_TAG, 50)
+            ),
+            exifEntries = listOf(
+                exifAsciiEntry(DATE_TIME_ORIGINAL_TAG, "2026:01:02 03:04:05+0530")
+            )
+        )
+
+        val parsed = parseJpegExifMetadata(jpegBytes)
+
+        assertNotNull(parsed)
+        assertEquals("2026-01-02T03:04:05", parsed.captureDateTime)
+        assertEquals("+05:30", parsed.timeZone)
+    }
+
+    @Test
+    fun jpegExifParserExtractsTimezoneFromTimeZoneOffsetTag() {
+        val jpegBytes = buildJpegWithExif(
+            entries = listOf(
+                exifLongEntry(EXIF_IFD_POINTER_TAG, 50)
+            ),
+            exifEntries = listOf(
+                exifAsciiEntry(DATE_TIME_ORIGINAL_TAG, "2026:01:02 03:04:05"),
+                exifSignedShortEntry(TIME_ZONE_OFFSET_TAG, -5)
+            )
+        )
+
+        val parsed = parseJpegExifMetadata(jpegBytes)
+
+        assertNotNull(parsed)
+        assertEquals("2026-01-02T03:04:05", parsed.captureDateTime)
+        assertEquals("-05:00", parsed.timeZone)
+    }
+
+    @Test
     fun dryRunPlanComposesUploadMetadataTagAndAlbumRequestsForSelection() {
         val a = LocalAssetId("a")
         val b = LocalAssetId("b")
@@ -801,6 +839,16 @@ private fun exifShortEntry(tag: Int, value: Int): ExifEntry =
         valueBytes = byteArrayOf((value and 0xFF).toByte(), ((value shr 8) and 0xFF).toByte())
     )
 
+private fun exifSignedShortEntry(tag: Int, value: Int): ExifEntry {
+    val raw = value and 0xFFFF
+    return ExifEntry(
+        tag = tag,
+        type = 8,
+        count = 1,
+        valueBytes = byteArrayOf((raw and 0xFF).toByte(), ((raw shr 8) and 0xFF).toByte())
+    )
+}
+
 private fun exifLongEntry(tag: Int, value: Int): ExifEntry =
     ExifEntry(
         tag = tag,
@@ -908,5 +956,6 @@ private const val MODEL_TAG = 0x0110
 private const val EXIF_IFD_POINTER_TAG = 0x8769
 private const val DATE_TIME_ORIGINAL_TAG = 0x9003
 private const val OFFSET_TIME_ORIGINAL_TAG = 0x9011
+private const val TIME_ZONE_OFFSET_TAG = 0x882A
 private const val ISO_SPEED_TAG = 0x8827
 private const val F_NUMBER_TAG = 0x829D
