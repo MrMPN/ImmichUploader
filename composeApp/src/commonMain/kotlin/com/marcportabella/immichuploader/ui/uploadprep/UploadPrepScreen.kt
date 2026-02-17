@@ -134,7 +134,7 @@ fun UploadPrepScreen(
     )
 }
 
-@Preview
+@Preview(widthDp = 1600, heightDp = 900, showBackground = true)
 @Composable
 private fun UploadPrepScreenRoutePreview(
     @PreviewParameter(UploadPrepScreenPreviewProvider::class) model: UploadPrepScreenPreviewModel
