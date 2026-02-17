@@ -426,4 +426,70 @@ class UploadPrepReducerSliceWebTest {
         assertNull(resetByDryRunClear.executionMessage)
         assertNull(resetByDryRunClear.executionRequestCount)
     }
+
+    @Test
+    fun createSessionTagForBulkAddsCatalogTagAndUpdatesBulkDraft() {
+        val initial = UploadPrepState(
+            bulkEditDraft = BulkEditDraft(
+                addTagIds = "existing-tag",
+                removeTagIds = "old-tag"
+            ),
+            availableTags = listOf(UploadCatalogEntry("existing-tag", "Existing"))
+        )
+
+        val next = reduceUploadPrepState(
+            initial,
+            UploadPrepAction.CreateSessionTagForBulk("Trip 2026")
+        )
+
+        assertEquals(2, next.availableTags.size)
+        assertTrue(next.availableTags.any { it.name == "Trip 2026" })
+        val sessionId = next.availableTags.first { it.name == "Trip 2026" }.id
+        assertEquals("existing-tag,$sessionId", next.bulkEditDraft.addTagIds)
+        assertEquals("old-tag", next.bulkEditDraft.removeTagIds)
+        assertEquals("Trip 2026", next.sessionTagsById[sessionId])
+    }
+
+    @Test
+    fun createSessionTagForAssetStagesTagPatchAndKeepsTagCatalogInSession() {
+        val assetId = LocalAssetId("asset-1")
+        val initial = UploadPrepState(
+            assets = mapOf(assetId to LocalAsset(assetId, "a.jpg", "image/jpeg", 1, null, null, null)),
+            selectedAssetIds = setOf(assetId)
+        )
+
+        val next = reduceUploadPrepState(
+            initial,
+            UploadPrepAction.CreateSessionTagForAsset(assetId, "Roadtrip")
+        )
+
+        val patch = next.stagedEditsByAssetId[assetId]
+        assertNotNull(patch)
+        assertEquals(1, patch.addTagIds.size)
+        assertTrue(next.availableTags.any { it.name == "Roadtrip" })
+        val sessionId = patch.addTagIds.first()
+        assertEquals("Roadtrip", next.sessionTagsById[sessionId])
+    }
+
+    @Test
+    fun replaceTagEditsForAssetAllowsDeselectingPreviouslyAddedTags() {
+        val assetId = LocalAssetId("asset-1")
+        val initial = UploadPrepState(
+            assets = mapOf(assetId to LocalAsset(assetId, "a.jpg", "image/jpeg", 1, null, null, null)),
+            stagedEditsByAssetId = mapOf(
+                assetId to AssetEditPatch(addTagIds = setOf("session-tag:abc"))
+            )
+        )
+
+        val next = reduceUploadPrepState(
+            initial,
+            UploadPrepAction.ReplaceTagEditsForAsset(
+                assetId = assetId,
+                addTagIds = emptySet(),
+                removeTagIds = emptySet()
+            )
+        )
+
+        assertNull(next.stagedEditsByAssetId[assetId])
+    }
 }

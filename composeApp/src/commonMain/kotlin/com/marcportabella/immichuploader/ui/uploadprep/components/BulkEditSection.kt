@@ -16,6 +16,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -35,10 +39,13 @@ fun BulkEditSection(
     availableTags: List<UploadCatalogEntry>,
     selectedTagIds: Set<String>,
     onDraftChange: (BulkEditDraft) -> Unit,
+    onCreateSessionTag: (String) -> Unit,
     onApply: () -> Unit,
     onClearDraft: () -> Unit,
     onClearSelectedStaged: () -> Unit
 ) {
+    var newTagName by rememberSaveable { mutableStateOf("") }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -175,6 +182,26 @@ fun BulkEditSection(
             )
 
             OutlinedTextField(
+                value = newTagName,
+                onValueChange = { newTagName = it },
+                label = { Text("New session tag") },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Button(
+                onClick = {
+                    val name = newTagName.trim()
+                    if (name.isNotEmpty()) {
+                        onCreateSessionTag(name)
+                        newTagName = ""
+                    }
+                },
+                enabled = newTagName.isNotBlank()
+            ) {
+                Text("Create and select tag")
+            }
+
+            OutlinedTextField(
                 value = draft.removeTagIds,
                 onValueChange = { onDraftChange(draft.copy(removeTagIds = it)) },
                 label = { Text("Remove tag IDs (comma separated)") },
@@ -221,6 +248,7 @@ private fun BulkEditSectionPreview(
             availableTags = previewCatalogTags(),
             selectedTagIds = setOf("tag-1", "tag-3"),
             onDraftChange = {},
+            onCreateSessionTag = {},
             onApply = {},
             onClearDraft = {},
             onClearSelectedStaged = {}

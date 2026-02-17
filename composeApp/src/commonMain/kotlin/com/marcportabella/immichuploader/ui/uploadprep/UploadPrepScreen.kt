@@ -45,8 +45,13 @@ fun UploadPrepScreen(
         onClearSelection = { stateHolder.clearSelection() },
         onToggleSelection = { stateHolder.toggleSelection(it) },
         onSingleAssetPatch = { assetId, patch -> stateHolder.patchSingleAsset(assetId, patch) },
+        onSingleAssetTagSelectionReplace = { assetId, addTagIds, removeTagIds ->
+            stateHolder.replaceSingleAssetTagSelection(assetId, addTagIds, removeTagIds)
+        },
         onClearSingleSelectionStaged = { stateHolder.clearSingleSelectionStaged() },
         onBulkDraftChange = { draft -> stateHolder.updateBulkDraft(draft) },
+        onCreateSessionTagForBulk = { name -> stateHolder.createSessionTagForBulk(name) },
+        onCreateSessionTagForAsset = { assetId, name -> stateHolder.createSessionTagForAsset(assetId, name) },
         onApplyBulk = { stateHolder.applyBulk() },
         onClearBulkDraft = { stateHolder.clearBulkDraft() },
         onClearSelectedStaged = { stateHolder.clearSelectedStaged() },

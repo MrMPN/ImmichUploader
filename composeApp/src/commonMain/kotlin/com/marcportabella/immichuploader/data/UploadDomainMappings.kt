@@ -20,7 +20,8 @@ fun UploadRequestPlan.toDataRequestPlan(): ImmichRequestPlan =
         bulkMetadataRequests = bulkMetadataRequests.map(UploadBulkMetadataRequest::toDataBulkMetadataRequest),
         tagAssignRequests = tagAssignRequests.map(UploadTagAssignRequest::toDataTagAssignRequest),
         albumAddRequests = albumAddRequests.map(UploadAlbumAddRequest::toDataAlbumAddRequest),
-        lookupHooks = lookupHooks.map(UploadLookupHook::toDataLookupHook)
+        lookupHooks = lookupHooks.map(UploadLookupHook::toDataLookupHook),
+        sessionTagsById = sessionTagsById
     )
 
 private fun UploadUploadRequest.toDataUploadRequest(): ImmichUploadRequest =

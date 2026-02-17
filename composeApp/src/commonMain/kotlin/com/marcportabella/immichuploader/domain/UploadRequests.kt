@@ -64,7 +64,8 @@ data class UploadRequestPlan(
     val bulkMetadataRequests: List<UploadBulkMetadataRequest> = emptyList(),
     val tagAssignRequests: List<UploadTagAssignRequest> = emptyList(),
     val albumAddRequests: List<UploadAlbumAddRequest> = emptyList(),
-    val lookupHooks: List<UploadLookupHook> = emptyList()
+    val lookupHooks: List<UploadLookupHook> = emptyList(),
+    val sessionTagsById: Map<String, String> = emptyMap()
 )
 
 object UploadRequestPlanner {
@@ -100,7 +101,7 @@ object UploadRequestPlanner {
             shouldLookupAlbums = state.availableAlbums.isEmpty(),
             shouldLookupTags = state.availableTags.isEmpty(),
             albumsToCreate = setOf(state.albumCreateDraft),
-            tagsToCreate = setOf(state.tagCreateDraft)
+            tagsToCreate = collectSessionTagNamesForSelection(state) + setOf(state.tagCreateDraft)
         )
 
         return UploadRequestPlan(
@@ -108,7 +109,8 @@ object UploadRequestPlanner {
             bulkMetadataRequests = bulkMetadataRequests,
             tagAssignRequests = tagAssignRequests,
             albumAddRequests = albumAddRequests,
-            lookupHooks = lookupHooks
+            lookupHooks = lookupHooks,
+            sessionTagsById = state.sessionTagsById
         )
     }
 
@@ -245,6 +247,15 @@ object UploadRequestPlanner {
             hooks += UploadLookupHook.CreateTagIfMissing(it)
         }
         return hooks
+    }
+
+    private fun collectSessionTagNamesForSelection(state: UploadPrepState): Set<String> {
+        if (state.selectedAssetIds.isEmpty() || state.sessionTagsById.isEmpty()) return emptySet()
+        return state.selectedAssetIds
+            .mapNotNull { state.stagedEditsByAssetId[it] }
+            .flatMap { patch -> patch.addTagIds }
+            .mapNotNull { sessionTagId -> state.sessionTagsById[sessionTagId] }
+            .toSet()
     }
 }
 

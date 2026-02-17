@@ -305,4 +305,23 @@ class UploadRequestPlannerSliceWebTest {
         assertEquals("$IMMICH_API_BASE_URL/albums", request.url)
         assertNull(request.body)
     }
+
+    @Test
+    fun dryRunPlanIncludesSessionTagCreateHookWhenSessionTagIsStaged() {
+        val assetId = LocalAssetId("a")
+        val sessionTagId = "session-tag:abc123"
+        val state = UploadPrepState(
+            assets = mapOf(assetId to LocalAsset(assetId, "a.jpg", "image/jpeg", 1, null, null, null)),
+            selectedAssetIds = setOf(assetId),
+            stagedEditsByAssetId = mapOf(
+                assetId to AssetEditPatch(addTagIds = setOf(sessionTagId))
+            ),
+            sessionTagsById = mapOf(sessionTagId to "Roadtrip")
+        )
+
+        val plan = ImmichRequestBuilder.buildDryRunPlan(state)
+
+        assertEquals("Roadtrip", plan.sessionTagsById[sessionTagId])
+        assertTrue(plan.lookupHooks.any { it == ImmichLookupHook.CreateTagIfMissing("Roadtrip") })
+    }
 }

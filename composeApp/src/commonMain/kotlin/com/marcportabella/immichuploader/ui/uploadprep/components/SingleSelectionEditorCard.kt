@@ -15,6 +15,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -32,10 +36,13 @@ internal fun SingleSelectionEditorCard(
     availableAlbums: List<UploadCatalogEntry>,
     availableTags: List<UploadCatalogEntry>,
     onPatch: (AssetEditPatch) -> Unit,
+    onTagSelectionReplace: (Set<String>, Set<String>) -> Unit,
+    onCreateSessionTag: (String) -> Unit,
     onClearStaged: () -> Unit
 ) {
     val metadata = asset.toDisplayMetadata(patch)
     val favorite = metadata.isFavorite ?: false
+    var newTagName by rememberSaveable { mutableStateOf("") }
 
     Card(
         modifier = Modifier.fillMaxWidth().animateContentSize(),
@@ -99,9 +106,34 @@ internal fun SingleSelectionEditorCard(
                     val desired = if (selected) metadata.tagIds - tagId else metadata.tagIds + tagId
                     val addTagIds = desired - asset.tagIds
                     val removeTagIds = asset.tagIds - desired
-                    onPatch(AssetEditPatch(addTagIds = addTagIds, removeTagIds = removeTagIds))
+                    onTagSelectionReplace(addTagIds, removeTagIds)
                 }
             )
+
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedTextField(
+                    value = newTagName,
+                    onValueChange = { newTagName = it },
+                    label = { Text("New session tag") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Button(
+                    onClick = {
+                        val name = newTagName.trim()
+                        if (name.isNotEmpty()) {
+                            onCreateSessionTag(name)
+                            newTagName = ""
+                        }
+                    },
+                    enabled = newTagName.isNotBlank()
+                ) {
+                    Text("Add tag")
+                }
+            }
 
             FlowRow(
                 modifier = Modifier.fillMaxWidth(),
@@ -128,6 +160,8 @@ private fun SingleSelectionEditorCardPreview() {
             availableAlbums = previewCatalogAlbums(),
             availableTags = previewCatalogTags(),
             onPatch = {},
+            onTagSelectionReplace = { _, _ -> },
+            onCreateSessionTag = {},
             onClearStaged = {}
         )
     }

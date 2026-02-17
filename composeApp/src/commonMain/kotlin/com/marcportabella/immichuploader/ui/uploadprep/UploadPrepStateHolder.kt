@@ -121,6 +121,12 @@ class UploadPrepStateHolder(
     fun patchSingleAsset(assetId: LocalAssetId, patch: AssetEditPatch) =
         dispatch(UploadPrepAction.StageEditForAsset(assetId, patch))
 
+    fun replaceSingleAssetTagSelection(
+        assetId: LocalAssetId,
+        addTagIds: Set<String>,
+        removeTagIds: Set<String>
+    ) = dispatch(UploadPrepAction.ReplaceTagEditsForAsset(assetId, addTagIds, removeTagIds))
+
     fun clearSingleSelectionStaged() = dispatch(UploadPrepAction.ClearStagedForSelected)
 
     fun updateBulkDraft(draft: BulkEditDraft) = dispatch(UploadPrepAction.SetBulkEditDraft(draft))
@@ -130,6 +136,11 @@ class UploadPrepStateHolder(
     fun clearBulkDraft() = dispatch(UploadPrepAction.ClearBulkEditDraft)
 
     fun clearSelectedStaged() = dispatch(UploadPrepAction.ClearStagedForSelected)
+
+    fun createSessionTagForBulk(name: String) = dispatch(UploadPrepAction.CreateSessionTagForBulk(name))
+
+    fun createSessionTagForAsset(assetId: LocalAssetId, name: String) =
+        dispatch(UploadPrepAction.CreateSessionTagForAsset(assetId, name))
 
     fun clearCatalogMessage() = dispatch(UploadPrepAction.ClearCatalogMessage)
 

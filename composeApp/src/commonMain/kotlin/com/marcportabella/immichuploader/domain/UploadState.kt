@@ -30,6 +30,7 @@ data class UploadPrepState(
     val tagCreateDraft: String = "",
     val availableAlbums: List<UploadCatalogEntry> = emptyList(),
     val availableTags: List<UploadCatalogEntry> = emptyList(),
+    val sessionTagsById: Map<String, String> = emptyMap(),
     val catalogStatus: CatalogUiStatus = CatalogUiStatus.Idle,
     val catalogMessage: String? = null,
     val dryRunPlan: UploadRequestPlan? = null,
@@ -75,6 +76,11 @@ sealed interface UploadPrepAction {
     data object ClearSelection : UploadPrepAction
     data class StageEditForSelected(val patch: AssetEditPatch) : UploadPrepAction
     data class StageEditForAsset(val assetId: LocalAssetId, val patch: AssetEditPatch) : UploadPrepAction
+    data class ReplaceTagEditsForAsset(
+        val assetId: LocalAssetId,
+        val addTagIds: Set<String>,
+        val removeTagIds: Set<String>
+    ) : UploadPrepAction
     data object ClearStagedForSelected : UploadPrepAction
     data class SetBulkEditDraft(val draft: BulkEditDraft) : UploadPrepAction
     data object ApplyBulkEditDraftToSelected : UploadPrepAction
@@ -82,6 +88,8 @@ sealed interface UploadPrepAction {
     data class SetApiKey(val value: String) : UploadPrepAction
     data class SetAlbumCreateDraft(val value: String) : UploadPrepAction
     data class SetTagCreateDraft(val value: String) : UploadPrepAction
+    data class CreateSessionTagForBulk(val name: String) : UploadPrepAction
+    data class CreateSessionTagForAsset(val assetId: LocalAssetId, val name: String) : UploadPrepAction
     data object CatalogRequestStarted : UploadPrepAction
     data class CatalogAlbumsLoaded(val albums: List<UploadCatalogEntry>, val message: String) : UploadPrepAction
     data class CatalogTagsLoaded(val tags: List<UploadCatalogEntry>, val message: String) : UploadPrepAction
@@ -142,6 +150,22 @@ fun reduceUploadPrepState(state: UploadPrepState, action: UploadPrepAction): Upl
         is UploadPrepAction.StageEditForAsset -> {
             if (action.assetId !in state.assets) return state
             stagePatchForIds(state, setOf(action.assetId), action.patch)
+        }
+
+        is UploadPrepAction.ReplaceTagEditsForAsset -> {
+            if (action.assetId !in state.assets) return state
+            val current = state.stagedEditsByAssetId[action.assetId] ?: AssetEditPatch()
+            val nextPatch = current.copy(
+                addTagIds = action.addTagIds,
+                removeTagIds = action.removeTagIds
+            )
+            val nextStaged = state.stagedEditsByAssetId.toMutableMap()
+            if (isNoopPatch(nextPatch)) {
+                nextStaged.remove(action.assetId)
+            } else {
+                nextStaged[action.assetId] = nextPatch
+            }
+            state.copy(stagedEditsByAssetId = nextStaged)
         }
 
         UploadPrepAction.ClearStagedForSelected -> {
@@ -222,6 +246,45 @@ fun reduceUploadPrepState(state: UploadPrepState, action: UploadPrepAction): Upl
             catalogStatus = CatalogUiStatus.Ready,
             catalogMessage = action.message
         )
+
+        is UploadPrepAction.CreateSessionTagForBulk -> {
+            val resolved = resolveOrCreateTagEntry(state, action.name) ?: return state
+            val addIds = parseTagList(state.bulkEditDraft.addTagIds) + resolved.id
+            val removeIds = parseTagList(state.bulkEditDraft.removeTagIds) - resolved.id
+            state.copy(
+                availableTags = resolved.availableTags,
+                sessionTagsById = resolved.sessionTagsById,
+                bulkEditDraft = state.bulkEditDraft.copy(
+                    addTagIds = addIds.sorted().joinToString(","),
+                    removeTagIds = removeIds.sorted().joinToString(",")
+                ),
+                batchFeedback = null
+            )
+        }
+
+        is UploadPrepAction.CreateSessionTagForAsset -> {
+            val asset = state.assets[action.assetId] ?: return state
+            val resolved = resolveOrCreateTagEntry(state, action.name) ?: return state
+            val currentPatch = state.stagedEditsByAssetId[action.assetId]
+            val selectedIds = (asset.tagIds + (currentPatch?.addTagIds ?: emptySet())) - (currentPatch?.removeTagIds ?: emptySet())
+            if (resolved.id in selectedIds &&
+                resolved.availableTags == state.availableTags &&
+                resolved.sessionTagsById == state.sessionTagsById
+            ) {
+                return state
+            }
+
+            val desiredIds = selectedIds + resolved.id
+            val patch = AssetEditPatch(
+                addTagIds = desiredIds - asset.tagIds,
+                removeTagIds = asset.tagIds - desiredIds
+            )
+            stagePatchForIds(state, setOf(action.assetId), patch).copy(
+                availableTags = resolved.availableTags,
+                sessionTagsById = resolved.sessionTagsById,
+                batchFeedback = null
+            )
+        }
 
         is UploadPrepAction.CatalogBlockedMissingApiKey -> state.copy(
             catalogStatus = CatalogUiStatus.BlockedMissingApiKey,
@@ -339,6 +402,16 @@ private fun stagePatchForIds(
 
     return state.copy(stagedEditsByAssetId = nextStaged)
 }
+
+private fun isNoopPatch(patch: AssetEditPatch): Boolean =
+    patch.description is FieldPatch.Unset &&
+        patch.isFavorite is FieldPatch.Unset &&
+        patch.dateTimeOriginal is FieldPatch.Unset &&
+        patch.timeZone is FieldPatch.Unset &&
+        patch.albumId is FieldPatch.Unset &&
+        patch.addTagIds.isEmpty() &&
+        patch.removeTagIds.isEmpty() &&
+        patch.customMetadata.isEmpty()
 
 private fun BulkEditDraft.toPatch(): AssetEditPatch? {
     val addTags = parseTagList(addTagIds)
@@ -475,3 +548,37 @@ class UploadPrepStore(initialState: UploadPrepState = UploadPrepState()) {
         state = reduceUploadPrepState(state, action)
     }
 }
+
+private data class ResolvedTagEntry(
+    val id: String,
+    val availableTags: List<UploadCatalogEntry>,
+    val sessionTagsById: Map<String, String>
+)
+
+private fun resolveOrCreateTagEntry(state: UploadPrepState, rawName: String): ResolvedTagEntry? {
+    val normalizedName = rawName.trim()
+    if (normalizedName.isEmpty()) return null
+
+    val existing = state.availableTags.firstOrNull { it.name.equals(normalizedName, ignoreCase = true) }
+    if (existing != null) {
+        return ResolvedTagEntry(
+            id = existing.id,
+            availableTags = state.availableTags,
+            sessionTagsById = state.sessionTagsById
+        )
+    }
+
+    val sessionId = buildSessionTagId(normalizedName)
+    val entry = UploadCatalogEntry(id = sessionId, name = normalizedName)
+    val nextSessionTags = state.sessionTagsById + (sessionId to normalizedName)
+    return ResolvedTagEntry(
+        id = sessionId,
+        availableTags = (state.availableTags + entry).sortedBy { it.name.lowercase() },
+        sessionTagsById = nextSessionTags
+    )
+}
+
+private const val SESSION_TAG_ID_PREFIX = "session-tag:"
+
+private fun buildSessionTagId(name: String): String =
+    "$SESSION_TAG_ID_PREFIX${name.lowercase().trim().hashCode().toUInt().toString(16)}"
