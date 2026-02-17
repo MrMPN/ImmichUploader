@@ -1,4 +1,4 @@
-package com.marcportabella.immichuploader.ui
+package com.marcportabella.immichuploader.ui.uploadprep
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement

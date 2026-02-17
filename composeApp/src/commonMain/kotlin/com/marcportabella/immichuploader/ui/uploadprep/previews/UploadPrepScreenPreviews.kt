@@ -1,4 +1,4 @@
-package com.marcportabella.immichuploader.ui
+package com.marcportabella.immichuploader.ui.uploadprep
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable

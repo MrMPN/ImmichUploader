@@ -8,7 +8,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import com.marcportabella.immichuploader.domain.UploadPrepState
 import com.marcportabella.immichuploader.domain.UploadPrepStore
-import com.marcportabella.immichuploader.ui.UploadPrepScreen
+import com.marcportabella.immichuploader.ui.uploadprep.UploadPrepScreen
 
 @Composable
 fun App() {
