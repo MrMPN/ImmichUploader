@@ -6,11 +6,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
-import com.marcportabella.immichuploader.data.ImmichCatalogEntry
 import com.marcportabella.immichuploader.domain.AssetEditPatch
 import com.marcportabella.immichuploader.domain.BulkEditDraft
 import com.marcportabella.immichuploader.domain.LocalAsset
 import com.marcportabella.immichuploader.domain.LocalAssetId
+import com.marcportabella.immichuploader.domain.UploadCatalogEntry
 
 @Composable
 fun SelectionSidebarPane(
@@ -19,8 +19,8 @@ fun SelectionSidebarPane(
     bulkDraft: BulkEditDraft,
     selectedCount: Int,
     applyEnabled: Boolean,
-    availableAlbums: List<ImmichCatalogEntry>,
-    availableTags: List<ImmichCatalogEntry>,
+    availableAlbums: List<UploadCatalogEntry>,
+    availableTags: List<UploadCatalogEntry>,
     catalogMessage: String?,
     preflightMessage: String?,
     onSingleAssetPatch: (LocalAssetId, AssetEditPatch) -> Unit,

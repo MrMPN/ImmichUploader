@@ -15,13 +15,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
-import com.marcportabella.immichuploader.data.ImmichApiRequest
-import com.marcportabella.immichuploader.data.ImmichRequestPlan
+import com.marcportabella.immichuploader.domain.UploadApiRequest
+import com.marcportabella.immichuploader.domain.UploadRequestPlan
 
 @Composable
 fun DryRunInspectorSection(
-    plan: ImmichRequestPlan?,
-    requests: List<ImmichApiRequest>,
+    plan: UploadRequestPlan?,
+    requests: List<UploadApiRequest>,
     message: String?
 ) {
     Card(

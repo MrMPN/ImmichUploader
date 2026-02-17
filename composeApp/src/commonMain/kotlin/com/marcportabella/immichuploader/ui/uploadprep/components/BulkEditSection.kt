@@ -21,8 +21,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
-import com.marcportabella.immichuploader.data.ImmichCatalogEntry
 import com.marcportabella.immichuploader.domain.BulkEditDraft
+import com.marcportabella.immichuploader.domain.UploadCatalogEntry
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -31,8 +31,8 @@ fun BulkEditSection(
     selectedCount: Int,
     applyEnabled: Boolean,
     preflightMessage: String?,
-    availableAlbums: List<ImmichCatalogEntry>,
-    availableTags: List<ImmichCatalogEntry>,
+    availableAlbums: List<UploadCatalogEntry>,
+    availableTags: List<UploadCatalogEntry>,
     selectedTagIds: Set<String>,
     onDraftChange: (BulkEditDraft) -> Unit,
     onApply: () -> Unit,

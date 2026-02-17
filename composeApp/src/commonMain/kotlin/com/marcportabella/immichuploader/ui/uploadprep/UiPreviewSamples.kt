@@ -1,9 +1,6 @@
 package com.marcportabella.immichuploader.ui.uploadprep
 
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
-import com.marcportabella.immichuploader.data.ImmichApiRequest
-import com.marcportabella.immichuploader.data.ImmichCatalogEntry
-import com.marcportabella.immichuploader.data.ImmichRequestPlan
 import com.marcportabella.immichuploader.domain.AssetEditPatch
 import com.marcportabella.immichuploader.domain.BatchFeedback
 import com.marcportabella.immichuploader.domain.BatchFeedbackLevel
@@ -11,7 +8,10 @@ import com.marcportabella.immichuploader.domain.BulkEditDraft
 import com.marcportabella.immichuploader.domain.FieldPatch
 import com.marcportabella.immichuploader.domain.LocalAsset
 import com.marcportabella.immichuploader.domain.LocalAssetId
+import com.marcportabella.immichuploader.domain.UploadApiRequest
+import com.marcportabella.immichuploader.domain.UploadCatalogEntry
 import com.marcportabella.immichuploader.domain.UploadExecutionStatus
+import com.marcportabella.immichuploader.domain.UploadRequestPlan
 
 internal fun previewAsset(
     id: String,
@@ -29,15 +29,15 @@ internal fun previewAsset(
     exifSummary = "ISO 400 | f/5.0 | 1/40s | 18.0 mm"
 )
 
-internal fun previewCatalogAlbums(): List<ImmichCatalogEntry> = listOf(
-    ImmichCatalogEntry(id = "album-1", name = "Japan 2016"),
-    ImmichCatalogEntry(id = "album-2", name = "Mountains")
+internal fun previewCatalogAlbums(): List<UploadCatalogEntry> = listOf(
+    UploadCatalogEntry(id = "album-1", name = "Japan 2016"),
+    UploadCatalogEntry(id = "album-2", name = "Mountains")
 )
 
-internal fun previewCatalogTags(): List<ImmichCatalogEntry> = listOf(
-    ImmichCatalogEntry(id = "tag-1", name = "Night"),
-    ImmichCatalogEntry(id = "tag-2", name = "Street"),
-    ImmichCatalogEntry(id = "tag-3", name = "Travel")
+internal fun previewCatalogTags(): List<UploadCatalogEntry> = listOf(
+    UploadCatalogEntry(id = "tag-1", name = "Night"),
+    UploadCatalogEntry(id = "tag-2", name = "Street"),
+    UploadCatalogEntry(id = "tag-3", name = "Travel")
 )
 
 internal fun previewSinglePatch(): AssetEditPatch = AssetEditPatch(
@@ -57,12 +57,12 @@ internal fun previewBulkDraft(): BulkEditDraft = BulkEditDraft(
     addTagIds = "tag-1,tag-3"
 )
 
-internal fun previewRequests(): List<ImmichApiRequest> = listOf(
-    ImmichApiRequest(method = "GET", url = "https://fotos.marcportabella.com/api/albums"),
-    ImmichApiRequest(method = "PATCH", url = "https://fotos.marcportabella.com/api/assets", body = """{"ids":["a1"]}""")
+internal fun previewRequests(): List<UploadApiRequest> = listOf(
+    UploadApiRequest(method = "GET", url = "https://fotos.marcportabella.com/api/albums"),
+    UploadApiRequest(method = "PATCH", url = "https://fotos.marcportabella.com/api/assets", body = """{"ids":["a1"]}""")
 )
 
-internal fun previewPlan(): ImmichRequestPlan = ImmichRequestPlan()
+internal fun previewPlan(): UploadRequestPlan = UploadRequestPlan()
 
 internal fun previewFeedback(): BatchFeedback = BatchFeedback(
     level = BatchFeedbackLevel.Success,
@@ -90,15 +90,15 @@ data class SidebarPreviewModel(
     val bulkDraft: BulkEditDraft,
     val selectedCount: Int,
     val applyEnabled: Boolean,
-    val availableAlbums: List<ImmichCatalogEntry>,
-    val availableTags: List<ImmichCatalogEntry>,
+    val availableAlbums: List<UploadCatalogEntry>,
+    val availableTags: List<UploadCatalogEntry>,
     val catalogMessage: String?,
     val preflightMessage: String?
 )
 
 data class DryRunPreviewModel(
-    val plan: ImmichRequestPlan?,
-    val requests: List<ImmichApiRequest>,
+    val plan: UploadRequestPlan?,
+    val requests: List<UploadApiRequest>,
     val message: String?
 )
 

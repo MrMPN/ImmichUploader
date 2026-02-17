@@ -19,18 +19,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.marcportabella.immichuploader.data.ImmichCatalogEntry
 import com.marcportabella.immichuploader.domain.AssetEditPatch
 import com.marcportabella.immichuploader.domain.FieldPatch
 import com.marcportabella.immichuploader.domain.LocalAsset
+import com.marcportabella.immichuploader.domain.UploadCatalogEntry
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun SingleSelectionEditorCard(
     asset: LocalAsset,
     patch: AssetEditPatch?,
-    availableAlbums: List<ImmichCatalogEntry>,
-    availableTags: List<ImmichCatalogEntry>,
+    availableAlbums: List<UploadCatalogEntry>,
+    availableTags: List<UploadCatalogEntry>,
     onPatch: (AssetEditPatch) -> Unit,
     onClearStaged: () -> Unit
 ) {

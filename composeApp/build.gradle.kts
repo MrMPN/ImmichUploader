@@ -41,6 +41,8 @@ kotlin {
     }
 
     sourceSets {
+        // Browser runtime code lives in webMain; keep jsMain/wasmJsMain empty unless
+        // target-specific Kotlin sources are intentionally introduced.
         matching { it.name == "webMain" }.configureEach {
             kotlin.srcDir(bootstrapConfigOutputDir)
         }
