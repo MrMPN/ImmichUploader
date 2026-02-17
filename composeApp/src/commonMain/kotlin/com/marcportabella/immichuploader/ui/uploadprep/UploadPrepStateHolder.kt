@@ -2,7 +2,6 @@ package com.marcportabella.immichuploader.ui.uploadprep
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.compose.ui.graphics.ImageBitmap
 import com.marcportabella.immichuploader.data.ApiImmichOnlineCatalogTransport
 import com.marcportabella.immichuploader.data.ApiImmichOnlineTransport
 import com.marcportabella.immichuploader.data.ApiKeyGatedImmichCatalogTransport
@@ -51,8 +50,6 @@ class UploadPrepStateHolder(
 
     val bulkPreflightMessage: String?
         get() = preflightBulkEditDraft(state)?.message
-
-    val thumbnailCache: MutableMap<LocalAssetId, ImageBitmap?> = mutableMapOf()
 
     suspend fun onFilesSelected(nextFiles: List<LocalIntakeFile>) {
         state.assets.values.mapNotNull { it.previewUrl }.forEach { revokePlatformPreviewUrl(it) }

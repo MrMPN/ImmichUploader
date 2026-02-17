@@ -9,7 +9,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.unit.dp
 import com.marcportabella.immichuploader.domain.AssetEditPatch
 import com.marcportabella.immichuploader.domain.LocalAsset
@@ -19,7 +18,6 @@ fun LazyListScope.assetQueueSection(
     selectedAssetIds: Set<LocalAssetId>,
     stagedEditsByAssetId: Map<LocalAssetId, AssetEditPatch>,
     sortedAssets: List<LocalAsset>,
-    thumbnailCache: MutableMap<LocalAssetId, ImageBitmap?>,
     columns: Int,
     onToggleSelection: (LocalAssetId) -> Unit
 ) {
@@ -51,7 +49,6 @@ fun LazyListScope.assetQueueSection(
                     asset = asset,
                     metadata = metadata,
                     isSelected = asset.id in selectedAssetIds,
-                    thumbnailCache = thumbnailCache,
                     onToggleSelection = onToggleSelection,
                     modifier = Modifier.weight(1f)
                 )

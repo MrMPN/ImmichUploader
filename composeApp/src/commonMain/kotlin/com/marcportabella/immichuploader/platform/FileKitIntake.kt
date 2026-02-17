@@ -12,16 +12,6 @@ suspend fun PlatformFile.toLocalIntakeFile(): LocalIntakeFile {
     val mimeType = mimeType()?.toString()?.ifBlank { null } ?: inferMimeTypeFromName(name)
     val bytes = runCatching { readBytes() }.getOrDefault(ByteArray(0))
 
-    val previewBytes = if (mimeType.startsWith("image/")) {
-        createPreviewBytes(
-            originalBytes = bytes,
-            mimeType = mimeType,
-            maxDimension = 256
-        )
-    } else {
-        null
-    }
-
     val exifMetadata = if (mimeType.equals("image/jpeg", ignoreCase = true) || mimeType.equals("image/jpg", ignoreCase = true)) {
         parseJpegExifMetadata(bytes)
     } else {
@@ -33,8 +23,8 @@ suspend fun PlatformFile.toLocalIntakeFile(): LocalIntakeFile {
         type = mimeType,
         size = runCatching { size() }.getOrDefault(0L),
         lastModifiedEpochMillis = 0L,
+        sourceFile = this,
         previewUrl = null,
-        previewBytes = previewBytes,
         captureDateTime = exifMetadata?.captureDateTime,
         timeZone = exifMetadata?.timeZone,
         cameraMake = exifMetadata?.cameraMake,

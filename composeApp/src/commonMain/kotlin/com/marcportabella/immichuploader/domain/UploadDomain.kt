@@ -1,5 +1,7 @@
 package com.marcportabella.immichuploader.domain
 
+import io.github.vinceglb.filekit.PlatformFile
+
 data class LocalAssetId(val value: String)
 
 data class LocalAsset(
@@ -14,11 +16,11 @@ data class LocalAsset(
     val isFavorite: Boolean? = null,
     val albumId: String? = null,
     val tagIds: Set<String> = emptySet(),
-    val previewBytes: ByteArray? = null,
     val cameraMake: String? = null,
     val cameraModel: String? = null,
     val exifMetadata: Map<String, String> = emptyMap(),
-    val exifSummary: String? = null
+    val exifSummary: String? = null,
+    val sourceFile: PlatformFile? = null
 )
 
 sealed interface FieldPatch<out T> {

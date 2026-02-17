@@ -1,5 +1,6 @@
 package com.marcportabella.immichuploader.domain
 
+import io.github.vinceglb.filekit.PlatformFile
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.UtcOffset
@@ -10,8 +11,8 @@ data class LocalIntakeFile(
     val type: String,
     val size: Long,
     val lastModifiedEpochMillis: Long,
+    val sourceFile: PlatformFile? = null,
     val previewUrl: String?,
-    val previewBytes: ByteArray? = null,
     val captureDateTime: String? = null,
     val timeZone: String? = null,
     val cameraMake: String? = null,
@@ -39,9 +40,9 @@ fun mapLocalIntakeFilesToAssets(files: List<LocalIntakeFile>): List<LocalAsset> 
             mimeType = normalizedType,
             fileSizeBytes = file.size,
             previewUrl = file.previewUrl,
+            sourceFile = file.sourceFile,
             captureDateTime = file.captureDateTime,
             timeZone = file.timeZone,
-            previewBytes = file.previewBytes,
             cameraMake = file.cameraMake,
             cameraModel = file.cameraModel,
             exifMetadata = file.exifMetadata,

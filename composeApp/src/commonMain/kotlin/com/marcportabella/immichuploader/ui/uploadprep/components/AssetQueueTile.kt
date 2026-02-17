@@ -14,7 +14,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -28,7 +27,6 @@ internal fun AssetQueueTile(
     asset: LocalAsset,
     metadata: DisplayMetadata,
     isSelected: Boolean,
-    thumbnailCache: MutableMap<LocalAssetId, ImageBitmap?>,
     onToggleSelection: (LocalAssetId) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -67,7 +65,6 @@ internal fun AssetQueueTile(
             if (ENABLE_QUEUE_PREVIEWS) {
                 AssetPreviewThumbnail(
                     asset = asset,
-                    thumbnailCache = thumbnailCache,
                     modifier = Modifier
                         .fillMaxWidth()
                         .aspectRatio(1.4f)
@@ -101,7 +98,6 @@ private fun AssetQueueTilePreview(
             asset = asset,
             metadata = asset.toDisplayMetadata(previewSinglePatch()),
             isSelected = true,
-            thumbnailCache = mutableMapOf(),
             onToggleSelection = {}
         )
     }

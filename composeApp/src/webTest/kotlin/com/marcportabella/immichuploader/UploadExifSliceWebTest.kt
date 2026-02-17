@@ -13,7 +13,6 @@ class UploadExifSliceWebTest {
 
     @Test
     fun localIntakeMapperBuildsAssetsWithPreviewMetadata() {
-        val previewBytes = byteArrayOf(1, 2, 3)
         val assets = mapLocalIntakeFilesToAssets(
             listOf(
                 LocalIntakeFile(
@@ -22,7 +21,6 @@ class UploadExifSliceWebTest {
                     size = 123,
                     lastModifiedEpochMillis = 1_700_000_000_000,
                     previewUrl = "blob:preview-1",
-                    previewBytes = previewBytes,
                     captureDateTime = "2026-01-02T03:04:05",
                     timeZone = "+01:00",
                     cameraMake = "Canon",
@@ -43,7 +41,6 @@ class UploadExifSliceWebTest {
         assertEquals("photo.jpg", assets[0].fileName)
         assertEquals("image/jpeg", assets[0].mimeType)
         assertEquals("blob:preview-1", assets[0].previewUrl)
-        assertEquals(previewBytes.toList(), assets[0].previewBytes?.toList())
         assertEquals("2026-01-02T03:04:05", assets[0].captureDateTime)
         assertEquals("+01:00", assets[0].timeZone)
         assertEquals("Canon", assets[0].cameraMake)

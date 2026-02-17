@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.safeContentPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.tooling.preview.Preview
@@ -33,7 +32,6 @@ internal fun UploadPrepScreenContent(
     sortedAssets: List<LocalAsset>,
     selectedAssets: List<LocalAsset>,
     bulkPreflightMessage: String?,
-    thumbnailCache: MutableMap<LocalAssetId, ImageBitmap?>,
     onOpenFilePicker: () -> Unit,
     onSelectAll: () -> Unit,
     onClearSelection: () -> Unit,
@@ -89,7 +87,6 @@ internal fun UploadPrepScreenContent(
                     selectedAssetIds = state.selectedAssetIds,
                     stagedEditsByAssetId = state.stagedEditsByAssetId,
                     sortedAssets = sortedAssets,
-                    thumbnailCache = thumbnailCache,
                     columns = 4,
                     onToggleSelection = onToggleSelection
                 )
@@ -163,7 +160,6 @@ internal fun UploadPrepScreenContent(
                         selectedAssetIds = state.selectedAssetIds,
                         stagedEditsByAssetId = state.stagedEditsByAssetId,
                         sortedAssets = sortedAssets,
-                        thumbnailCache = thumbnailCache,
                         columns = 5,
                         onToggleSelection = onToggleSelection
                     )
@@ -229,7 +225,6 @@ private fun UploadPrepScreenContentPreview(
             sortedAssets = model.sortedAssets,
             selectedAssets = model.selectedAssets,
             bulkPreflightMessage = model.bulkPreflightMessage,
-            thumbnailCache = mutableMapOf(),
             onOpenFilePicker = {},
             onSelectAll = {},
             onClearSelection = {},

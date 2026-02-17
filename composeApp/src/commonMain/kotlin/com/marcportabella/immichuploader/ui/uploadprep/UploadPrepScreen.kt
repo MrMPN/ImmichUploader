@@ -40,7 +40,6 @@ fun UploadPrepScreen(
         sortedAssets = stateHolder.sortedAssets,
         selectedAssets = stateHolder.selectedAssets,
         bulkPreflightMessage = stateHolder.bulkPreflightMessage,
-        thumbnailCache = stateHolder.thumbnailCache,
         onOpenFilePicker = { openPlatformFilePicker() },
         onSelectAll = { stateHolder.selectAll() },
         onClearSelection = { stateHolder.clearSelection() },

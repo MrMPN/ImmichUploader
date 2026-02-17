@@ -51,6 +51,7 @@ kotlin {
             implementation(libs.compose.uiToolingPreview)
         }
         commonMain.dependencies {
+            implementation(libs.filekit.coil)
             implementation(libs.filekit.core)
             implementation(libs.filekit.dialogs)
             implementation(libs.filekit.dialogs.compose)

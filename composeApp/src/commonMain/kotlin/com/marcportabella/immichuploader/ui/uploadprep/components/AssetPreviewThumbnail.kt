@@ -1,6 +1,5 @@
 package com.marcportabella.immichuploader.ui.uploadprep
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -8,34 +7,38 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
+import coil3.ImageLoader
+import coil3.compose.AsyncImage
+import coil3.compose.LocalPlatformContext
 import com.marcportabella.immichuploader.domain.LocalAsset
-import com.marcportabella.immichuploader.domain.LocalAssetId
-import com.marcportabella.immichuploader.platform.decodePreviewBitmap
+import io.github.vinceglb.filekit.coil.addPlatformFileSupport
 
 internal const val ENABLE_QUEUE_PREVIEWS = true
 
 @Composable
 internal fun AssetPreviewThumbnail(
     asset: LocalAsset,
-    thumbnailCache: MutableMap<LocalAssetId, ImageBitmap?>,
     modifier: Modifier = Modifier
 ) {
-    val imageBitmap = thumbnailCache.getOrPut(asset.id) {
-        val bytes = asset.previewBytes ?: return@getOrPut null
-        decodePreviewBitmap(bytes)
+    val platformContext = LocalPlatformContext.current
+    val imageLoader = remember(platformContext) {
+        ImageLoader.Builder(platformContext)
+            .components { addPlatformFileSupport() }
+            .build()
     }
 
-    if (imageBitmap != null) {
-        Image(
-            bitmap = imageBitmap,
+    if (asset.sourceFile != null && asset.mimeType.startsWith("image/")) {
+        AsyncImage(
+            model = asset.sourceFile,
             contentDescription = "${asset.fileName} preview",
+            imageLoader = imageLoader,
             contentScale = ContentScale.Crop,
             modifier = modifier
                 .clip(MaterialTheme.shapes.small)
@@ -45,7 +48,7 @@ internal fun AssetPreviewThumbnail(
     }
 
     val fallback = when {
-        asset.previewUrl == null -> "No preview"
+        asset.sourceFile == null -> "No preview"
         asset.mimeType.startsWith("video/") -> "Video preview n/a"
         else -> "Preview unavailable"
     }
@@ -88,7 +91,6 @@ private fun AssetPreviewThumbnailPreview(
     MaterialTheme {
         AssetPreviewThumbnail(
             asset = asset,
-            thumbnailCache = mutableMapOf(),
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(1.4f)
