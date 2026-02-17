@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import com.marcportabella.immichuploader.data.ImmichApiRequest
 import com.marcportabella.immichuploader.data.ImmichRequestPlan
@@ -78,12 +79,14 @@ fun DryRunInspectorSection(
 
 @Preview
 @Composable
-private fun DryRunInspectorSectionPreview() {
+private fun DryRunInspectorSectionPreview(
+    @PreviewParameter(DryRunPreviewProvider::class) model: DryRunPreviewModel
+) {
     MaterialTheme {
         DryRunInspectorSection(
-            plan = previewPlan(),
-            requests = previewRequests(),
-            message = "Dry-run generated 2 operations."
+            plan = model.plan,
+            requests = model.requests,
+            message = model.message
         )
     }
 }

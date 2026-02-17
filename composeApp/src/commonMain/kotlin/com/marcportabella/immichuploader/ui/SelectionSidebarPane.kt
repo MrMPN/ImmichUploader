@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import com.marcportabella.immichuploader.data.ImmichCatalogEntry
 import com.marcportabella.immichuploader.domain.AssetEditPatch
@@ -274,18 +275,21 @@ private fun parseCsvIds(value: String): Set<String> =
 
 @Preview
 @Composable
-private fun SelectionSidebarNoSelectionPreview() {
+private fun SelectionSidebarNoSelectionPreview(
+    @PreviewParameter(SidebarPreviewProvider::class) model: SidebarPreviewModel
+) {
+    if (model.selectedAssets.isNotEmpty()) return
     MaterialTheme {
         SelectionSidebarPane(
-            selectedAssets = emptyList(),
-            stagedEditsByAssetId = emptyMap(),
-            bulkDraft = previewBulkDraft(),
-            selectedCount = 0,
-            applyEnabled = false,
-            availableAlbums = previewCatalogAlbums(),
-            availableTags = previewCatalogTags(),
-            catalogMessage = PREVIEW_CATALOG_MESSAGE,
-            preflightMessage = null,
+            selectedAssets = model.selectedAssets,
+            stagedEditsByAssetId = model.stagedEditsByAssetId,
+            bulkDraft = model.bulkDraft,
+            selectedCount = model.selectedCount,
+            applyEnabled = model.applyEnabled,
+            availableAlbums = model.availableAlbums,
+            availableTags = model.availableTags,
+            catalogMessage = model.catalogMessage,
+            preflightMessage = model.preflightMessage,
             onSingleAssetPatch = { _, _ -> },
             onClearSingleSelectionStaged = {},
             onBulkDraftChange = {},
@@ -299,19 +303,21 @@ private fun SelectionSidebarNoSelectionPreview() {
 
 @Preview
 @Composable
-private fun SelectionSidebarSinglePreview() {
-    val asset = previewAsset(id = "a1", name = "2016-11-08_02-43-27.jpg")
+private fun SelectionSidebarSinglePreview(
+    @PreviewParameter(SidebarPreviewProvider::class) model: SidebarPreviewModel
+) {
+    if (model.selectedAssets.size != 1) return
     MaterialTheme {
         SelectionSidebarPane(
-            selectedAssets = listOf(asset),
-            stagedEditsByAssetId = mapOf(asset.id to previewSinglePatch()),
-            bulkDraft = previewBulkDraft(),
-            selectedCount = 1,
-            applyEnabled = true,
-            availableAlbums = previewCatalogAlbums(),
-            availableTags = previewCatalogTags(),
-            catalogMessage = PREVIEW_CATALOG_MESSAGE,
-            preflightMessage = null,
+            selectedAssets = model.selectedAssets,
+            stagedEditsByAssetId = model.stagedEditsByAssetId,
+            bulkDraft = model.bulkDraft,
+            selectedCount = model.selectedCount,
+            applyEnabled = model.applyEnabled,
+            availableAlbums = model.availableAlbums,
+            availableTags = model.availableTags,
+            catalogMessage = model.catalogMessage,
+            preflightMessage = model.preflightMessage,
             onSingleAssetPatch = { _, _ -> },
             onClearSingleSelectionStaged = {},
             onBulkDraftChange = {},
@@ -341,21 +347,21 @@ private fun SingleSelectionEditorCardPreview() {
 
 @Preview
 @Composable
-private fun SelectionSidebarBulkPreview() {
+private fun SelectionSidebarBulkPreview(
+    @PreviewParameter(SidebarPreviewProvider::class) model: SidebarPreviewModel
+) {
+    if (model.selectedAssets.size < 2) return
     MaterialTheme {
         SelectionSidebarPane(
-            selectedAssets = listOf(
-                previewAsset(id = "a1", name = "2016-11-08_02-43-27.jpg"),
-                previewAsset(id = "a2", name = "2016-11-09_05-13-27.jpg")
-            ),
-            stagedEditsByAssetId = emptyMap(),
-            bulkDraft = previewBulkDraft(),
-            selectedCount = 2,
-            applyEnabled = true,
-            availableAlbums = previewCatalogAlbums(),
-            availableTags = previewCatalogTags(),
-            catalogMessage = PREVIEW_CATALOG_MESSAGE,
-            preflightMessage = PREVIEW_PREFLIGHT_MESSAGE,
+            selectedAssets = model.selectedAssets,
+            stagedEditsByAssetId = model.stagedEditsByAssetId,
+            bulkDraft = model.bulkDraft,
+            selectedCount = model.selectedCount,
+            applyEnabled = model.applyEnabled,
+            availableAlbums = model.availableAlbums,
+            availableTags = model.availableTags,
+            catalogMessage = model.catalogMessage,
+            preflightMessage = model.preflightMessage,
             onSingleAssetPatch = { _, _ -> },
             onClearSingleSelectionStaged = {},
             onBulkDraftChange = {},

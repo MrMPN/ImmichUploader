@@ -26,6 +26,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import com.marcportabella.immichuploader.domain.AssetEditPatch
 import com.marcportabella.immichuploader.domain.FieldPatch
@@ -85,8 +86,9 @@ fun LazyListScope.assetQueueSection(
 
 @Preview
 @Composable
-private fun AssetQueueTilePreview() {
-    val asset = previewAsset(id = "a1", name = "2016-11-08_02-43-27.jpg")
+private fun AssetQueueTilePreview(
+    @PreviewParameter(LocalAssetPreviewProvider::class) asset: LocalAsset
+) {
     MaterialTheme {
         AssetQueueTile(
             asset = asset,
@@ -100,8 +102,9 @@ private fun AssetQueueTilePreview() {
 
 @Preview
 @Composable
-private fun AssetPreviewThumbnailPreview() {
-    val asset = previewAsset(id = "a1", name = "2016-11-08_02-43-27.jpg")
+private fun AssetPreviewThumbnailPreview(
+    @PreviewParameter(LocalAssetPreviewProvider::class) asset: LocalAsset
+) {
     MaterialTheme {
         AssetPreviewThumbnail(
             asset = asset,
