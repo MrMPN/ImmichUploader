@@ -47,10 +47,12 @@ kotlin {
             kotlin.srcDir(bootstrapConfigOutputDir)
         }
         androidMain.dependencies {
+            implementation(libs.logger.android)
             implementation(libs.ktor.client.okhttp)
             implementation(libs.compose.uiToolingPreview)
         }
         commonMain.dependencies {
+            implementation(libs.logger)
             implementation(libs.filekit.coil)
             implementation(libs.filekit.core)
             implementation(libs.filekit.dialogs)
@@ -70,6 +72,7 @@ kotlin {
             implementation(libs.androidx.lifecycle.runtimeCompose)
         }
         webMain.dependencies {
+            implementation(libs.logger.wasm.js)
             implementation(libs.ktor.client.js)
         }
         commonTest.dependencies {

@@ -1,8 +1,32 @@
 package com.marcportabella.immichuploader.platform
 
-expect fun platformLogInfo(message: String)
+import de.halfbit.logger.LoggableLevel
+import de.halfbit.logger.LoggerBuilder
+import de.halfbit.logger.i
+import de.halfbit.logger.e
+import de.halfbit.logger.initializeLogger
 
-expect fun platformLogError(message: String)
+private const val PLATFORM_LOG_TAG = "ImmichUploader"
+private var loggingInitialized: Boolean = false
+
+internal expect fun LoggerBuilder.registerPlatformLoggerSink()
+
+fun initializePlatformLogging(level: LoggableLevel = LoggableLevel.Everything) {
+    if (loggingInitialized) return
+    initializeLogger {
+        registerPlatformLoggerSink()
+        loggableLevel = level
+    }
+    loggingInitialized = true
+}
+
+fun platformLogInfo(message: String) {
+    i(PLATFORM_LOG_TAG) { message }
+}
+
+fun platformLogError(message: String) {
+    e(PLATFORM_LOG_TAG) { message }
+}
 
 fun Throwable.diagnosticMessage(): String {
     val parts = mutableListOf<String>()
