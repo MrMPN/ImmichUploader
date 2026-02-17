@@ -16,6 +16,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.marcportabella.immichuploader.domain.UploadExecutionStatus
 
@@ -71,5 +72,23 @@ fun RequestPlanExecutionCard(
             if (executionMessage != null) Text("Execution message: $executionMessage")
             if (executionRequestCount != null) Text("Submitted requests: $executionRequestCount")
         }
+    }
+}
+
+@Preview
+@Composable
+private fun RequestPlanExecutionCardPreview() {
+    MaterialTheme {
+        RequestPlanExecutionCard(
+            hasSelection = true,
+            hasPlan = true,
+            executionStatus = PREVIEW_EXECUTION_STATUS,
+            executionMessage = PREVIEW_EXECUTION_MESSAGE,
+            executionRequestCount = 2,
+            onGeneratePlan = {},
+            onClearPlan = {},
+            onExecute = {},
+            onClearExecutionStatus = {}
+        )
     }
 }

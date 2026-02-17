@@ -1,8 +1,11 @@
 package com.marcportabella.immichuploader.ui.uploadprep
 
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.tooling.preview.PreviewParameter
 import com.marcportabella.immichuploader.data.ImmichCatalogEntry
 import com.marcportabella.immichuploader.domain.AssetEditPatch
 import com.marcportabella.immichuploader.domain.BulkEditDraft
@@ -85,3 +88,87 @@ private fun parseCsvIds(value: String): Set<String> =
         .map { it.trim() }
         .filter { it.isNotEmpty() }
         .toSet()
+
+@Preview
+@Composable
+private fun SelectionSidebarNoSelectionPreview(
+    @PreviewParameter(SidebarPreviewProvider::class) model: SidebarPreviewModel
+) {
+    if (model.selectedAssets.isNotEmpty()) return
+    MaterialTheme {
+        SelectionSidebarPane(
+            selectedAssets = model.selectedAssets,
+            stagedEditsByAssetId = model.stagedEditsByAssetId,
+            bulkDraft = model.bulkDraft,
+            selectedCount = model.selectedCount,
+            applyEnabled = model.applyEnabled,
+            availableAlbums = model.availableAlbums,
+            availableTags = model.availableTags,
+            catalogMessage = model.catalogMessage,
+            preflightMessage = model.preflightMessage,
+            onSingleAssetPatch = { _, _ -> },
+            onClearSingleSelectionStaged = {},
+            onBulkDraftChange = {},
+            onApplyBulk = {},
+            onClearBulkDraft = {},
+            onClearSelectedStaged = {},
+            onClearCatalogMessage = {}
+        )
+    }
+}
+
+@Preview
+@Composable
+private fun SelectionSidebarSinglePreview(
+    @PreviewParameter(SidebarPreviewProvider::class) model: SidebarPreviewModel
+) {
+    if (model.selectedAssets.size != 1) return
+    MaterialTheme {
+        SelectionSidebarPane(
+            selectedAssets = model.selectedAssets,
+            stagedEditsByAssetId = model.stagedEditsByAssetId,
+            bulkDraft = model.bulkDraft,
+            selectedCount = model.selectedCount,
+            applyEnabled = model.applyEnabled,
+            availableAlbums = model.availableAlbums,
+            availableTags = model.availableTags,
+            catalogMessage = model.catalogMessage,
+            preflightMessage = model.preflightMessage,
+            onSingleAssetPatch = { _, _ -> },
+            onClearSingleSelectionStaged = {},
+            onBulkDraftChange = {},
+            onApplyBulk = {},
+            onClearBulkDraft = {},
+            onClearSelectedStaged = {},
+            onClearCatalogMessage = {}
+        )
+    }
+}
+
+@Preview
+@Composable
+private fun SelectionSidebarBulkPreview(
+    @PreviewParameter(SidebarPreviewProvider::class) model: SidebarPreviewModel
+) {
+    if (model.selectedAssets.size < 2) return
+    MaterialTheme {
+        SelectionSidebarPane(
+            selectedAssets = model.selectedAssets,
+            stagedEditsByAssetId = model.stagedEditsByAssetId,
+            bulkDraft = model.bulkDraft,
+            selectedCount = model.selectedCount,
+            applyEnabled = model.applyEnabled,
+            availableAlbums = model.availableAlbums,
+            availableTags = model.availableTags,
+            catalogMessage = model.catalogMessage,
+            preflightMessage = model.preflightMessage,
+            onSingleAssetPatch = { _, _ -> },
+            onClearSingleSelectionStaged = {},
+            onBulkDraftChange = {},
+            onApplyBulk = {},
+            onClearBulkDraft = {},
+            onClearSelectedStaged = {},
+            onClearCatalogMessage = {}
+        )
+    }
+}

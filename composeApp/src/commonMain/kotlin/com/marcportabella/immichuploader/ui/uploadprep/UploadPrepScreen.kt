@@ -6,6 +6,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.tooling.preview.PreviewParameter
 import com.marcportabella.immichuploader.data.ApiImmichOnlineCatalogTransport
 import com.marcportabella.immichuploader.data.ApiImmichOnlineTransport
 import com.marcportabella.immichuploader.data.ApiKeyGatedImmichCatalogTransport
@@ -129,4 +132,18 @@ fun UploadPrepScreen(
         onClearExecutionStatus = { store.dispatch(UploadPrepAction.ClearUploadExecutionStatus) },
         canApplyBulkEdit = { canApplyBulkEdit(it) }
     )
+}
+
+@Preview
+@Composable
+private fun UploadPrepScreenRoutePreview(
+    @PreviewParameter(UploadPrepScreenPreviewProvider::class) model: UploadPrepScreenPreviewModel
+) {
+    val previewStore = UploadPrepStore(model.state)
+    MaterialTheme {
+        UploadPrepScreen(
+            store = previewStore,
+            enableWebEffects = false
+        )
+    }
 }

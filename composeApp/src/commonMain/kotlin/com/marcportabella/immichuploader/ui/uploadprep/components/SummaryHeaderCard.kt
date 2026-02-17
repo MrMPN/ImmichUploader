@@ -14,6 +14,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -75,5 +76,20 @@ private fun SummaryPill(label: String, value: String) {
                 fontWeight = FontWeight.SemiBold
             )
         }
+    }
+}
+
+@Preview
+@Composable
+private fun SummaryHeaderCardPreview() {
+    MaterialTheme {
+        SummaryHeaderCard(
+            assetCount = 12,
+            selectedCount = 3,
+            stagedCount = 2,
+            gateStatus = PREVIEW_GATE_STATUS,
+            executionPath = PREVIEW_EXECUTION_PATH,
+            catalogGateStatus = PREVIEW_CATALOG_STATUS
+        )
     }
 }

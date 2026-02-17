@@ -17,6 +17,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.marcportabella.immichuploader.data.ImmichCatalogEntry
 import com.marcportabella.immichuploader.domain.AssetEditPatch
@@ -113,5 +114,21 @@ internal fun SingleSelectionEditorCard(
                 Button(onClick = onClearStaged) { Text("Clear staged for selected") }
             }
         }
+    }
+}
+
+@Preview
+@Composable
+private fun SingleSelectionEditorCardPreview() {
+    val asset = previewAsset(id = "a1", name = "2016-11-08_02-43-27.jpg")
+    MaterialTheme {
+        SingleSelectionEditorCard(
+            asset = asset,
+            patch = previewSinglePatch(),
+            availableAlbums = previewCatalogAlbums(),
+            availableTags = previewCatalogTags(),
+            onPatch = {},
+            onClearStaged = {}
+        )
     }
 }

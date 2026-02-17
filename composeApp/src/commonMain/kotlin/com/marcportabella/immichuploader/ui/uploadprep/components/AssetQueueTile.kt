@@ -17,6 +17,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import com.marcportabella.immichuploader.domain.LocalAsset
 import com.marcportabella.immichuploader.domain.LocalAssetId
@@ -86,5 +88,21 @@ internal fun AssetQueueTile(
                 overflow = TextOverflow.Ellipsis
             )
         }
+    }
+}
+
+@Preview
+@Composable
+private fun AssetQueueTilePreview(
+    @PreviewParameter(LocalAssetPreviewProvider::class) asset: LocalAsset
+) {
+    MaterialTheme {
+        AssetQueueTile(
+            asset = asset,
+            metadata = asset.toDisplayMetadata(previewSinglePatch()),
+            isSelected = true,
+            thumbnailCache = mutableMapOf(),
+            onToggleSelection = {}
+        )
     }
 }

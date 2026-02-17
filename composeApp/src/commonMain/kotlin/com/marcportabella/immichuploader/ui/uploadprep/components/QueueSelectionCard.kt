@@ -14,6 +14,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -52,5 +53,19 @@ fun QueueSelectionCard(
                 Button(onClick = onClearSelection, enabled = hasSelection) { Text("Clear selection") }
             }
         }
+    }
+}
+
+@Preview
+@Composable
+private fun QueueSelectionCardPreview() {
+    MaterialTheme {
+        QueueSelectionCard(
+            hasAssets = true,
+            hasSelection = true,
+            onOpenFilePicker = {},
+            onSelectAll = {},
+            onClearSelection = {}
+        )
     }
 }

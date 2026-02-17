@@ -2,6 +2,8 @@ package com.marcportabella.immichuploader.ui.uploadprep
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -10,6 +12,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import com.marcportabella.immichuploader.domain.LocalAsset
 import com.marcportabella.immichuploader.domain.LocalAssetId
@@ -74,4 +78,33 @@ internal fun PreviewDisabledPlaceholder(
             .background(MaterialTheme.colorScheme.surface)
             .padding(8.dp)
     )
+}
+
+@Preview
+@Composable
+private fun AssetPreviewThumbnailPreview(
+    @PreviewParameter(LocalAssetPreviewProvider::class) asset: LocalAsset
+) {
+    MaterialTheme {
+        AssetPreviewThumbnail(
+            asset = asset,
+            thumbnailCache = mutableMapOf(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(1.4f)
+        )
+    }
+}
+
+@Preview
+@Composable
+private fun PreviewDisabledPlaceholderPreview() {
+    MaterialTheme {
+        PreviewDisabledPlaceholder(
+            mimeType = "image/jpeg",
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(1.4f)
+        )
+    }
 }
