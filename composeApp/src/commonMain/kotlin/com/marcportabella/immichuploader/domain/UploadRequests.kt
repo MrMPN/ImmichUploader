@@ -14,17 +14,20 @@ private val uploadRequestJson: Json = Json {
     ignoreUnknownKeys = true
 }
 
+@Serializable
 data class UploadCatalogEntry(
     val id: String,
     val name: String
 )
 
+@Serializable
 data class UploadApiRequest(
     val method: String,
     val url: String,
     val body: String? = null
 )
 
+@Serializable
 data class UploadUploadRequest(
     val localAssetId: String,
     val deviceAssetId: String,
@@ -34,6 +37,7 @@ data class UploadUploadRequest(
     val metadata: Map<String, String>
 )
 
+@Serializable
 data class UploadBulkMetadataRequest(
     val ids: List<String>,
     val dateTimeOriginal: String? = null,
@@ -42,11 +46,13 @@ data class UploadBulkMetadataRequest(
     val isFavorite: Boolean? = null
 )
 
+@Serializable
 data class UploadTagAssignRequest(
     val assetIds: List<String>,
     val tagIds: List<String>
 )
 
+@Serializable
 data class UploadAlbumAddRequest(
     val albumId: String,
     val assetIds: List<String>
@@ -98,8 +104,6 @@ object UploadRequestPlanner {
         }
 
         val lookupHooks = buildLookupHooks(
-            shouldLookupAlbums = state.availableAlbums.isEmpty(),
-            shouldLookupTags = state.availableTags.isEmpty(),
             albumsToCreate = setOf(state.albumCreateDraft),
             tagsToCreate = collectSessionTagNamesForSelection(state) + setOf(state.tagCreateDraft)
         )
@@ -232,14 +236,10 @@ object UploadRequestPlanner {
     }
 
     private fun buildLookupHooks(
-        shouldLookupAlbums: Boolean,
-        shouldLookupTags: Boolean,
         albumsToCreate: Set<String>,
         tagsToCreate: Set<String>
     ): List<UploadLookupHook> {
         val hooks = mutableListOf<UploadLookupHook>()
-        if (shouldLookupAlbums) hooks += UploadLookupHook.LookupAlbums
-        if (shouldLookupTags) hooks += UploadLookupHook.LookupTags
         albumsToCreate.map { it.trim() }.filter { it.isNotEmpty() }.sorted().forEach {
             hooks += UploadLookupHook.CreateAlbumIfMissing(it)
         }

@@ -206,14 +206,10 @@ object ImmichRequestBuilder {
     }
 
     fun buildLookupHooks(
-        shouldLookupAlbums: Boolean,
-        shouldLookupTags: Boolean,
         albumsToCreate: Set<String>,
         tagsToCreate: Set<String>
     ): List<ImmichLookupHook> {
         val hooks = mutableListOf<ImmichLookupHook>()
-        if (shouldLookupAlbums) hooks += ImmichLookupHook.LookupAlbums
-        if (shouldLookupTags) hooks += ImmichLookupHook.LookupTags
         albumsToCreate.map { it.trim() }.filter { it.isNotEmpty() }.sorted().forEach {
             hooks += ImmichLookupHook.CreateAlbumIfMissing(it)
         }
@@ -252,8 +248,6 @@ object ImmichRequestBuilder {
         }
 
         val lookupHooks = buildLookupHooks(
-            shouldLookupAlbums = state.availableAlbums.isEmpty(),
-            shouldLookupTags = state.availableTags.isEmpty(),
             albumsToCreate = setOf(state.albumCreateDraft),
             tagsToCreate = collectSessionTagNamesForSelection(state) + setOf(state.tagCreateDraft)
         )
