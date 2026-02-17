@@ -5,10 +5,12 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 
@@ -27,7 +29,12 @@ fun SelectableChipGroup(
 ) {
     if (options.isEmpty()) return
 
-    Text(text = title, style = MaterialTheme.typography.labelMedium)
+    Text(
+        text = title,
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
     FlowRow(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -37,7 +44,24 @@ fun SelectableChipGroup(
             FilterChip(
                 selected = option.id in selectedIds,
                 onClick = { onToggle(option.id) },
-                label = { Text(option.label) }
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                ),
+                border = FilterChipDefaults.filterChipBorder(
+                    enabled = true,
+                    selected = option.id in selectedIds,
+                    borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
+                    selectedBorderColor = MaterialTheme.colorScheme.primary
+                ),
+                label = {
+                    Text(
+                        option.label,
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                }
             )
         }
     }
