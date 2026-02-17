@@ -1,12 +1,16 @@
 package com.marcportabella.immichuploader
 
 import com.marcportabella.immichuploader.data.IMMICH_API_BASE_URL
+import com.marcportabella.immichuploader.data.ImmichAlbumCreateBody
 import com.marcportabella.immichuploader.data.ImmichApiRequest
+import com.marcportabella.immichuploader.data.ImmichBulkMetadataBody
 import com.marcportabella.immichuploader.data.ImmichBulkMetadataRequest
 import com.marcportabella.immichuploader.data.ImmichLookupHook
 import com.marcportabella.immichuploader.data.ImmichRequestBuilder
 import com.marcportabella.immichuploader.data.ImmichRequestPlan
+import com.marcportabella.immichuploader.data.ImmichTagCreateBody
 import com.marcportabella.immichuploader.data.ImmichUploadRequest
+import com.marcportabella.immichuploader.data.ImmichUploadBody
 import com.marcportabella.immichuploader.domain.AssetEditPatch
 import com.marcportabella.immichuploader.domain.FieldPatch
 import com.marcportabella.immichuploader.domain.LocalAsset
@@ -181,8 +185,18 @@ class UploadRequestPlannerSliceWebTest {
         assertTrue(requests.any { it.method == "PUT" && it.url == "$IMMICH_API_BASE_URL/assets/updateAssets" })
         assertTrue(requests.any { it.method == "PUT" && it.url == "$IMMICH_API_BASE_URL/tags/assets" })
         assertTrue(requests.any { it.method == "PUT" && it.url == "$IMMICH_API_BASE_URL/albums/assets" })
-        assertTrue(requests.any { it.body?.contains("\"assetData\":\"<binary:") == true })
-        assertTrue(requests.any { it.body?.contains("\"description\":\"caption\"") == true })
+        assertTrue(
+            requests.any {
+                val payload = (it.body as? ImmichUploadBody)?.payload
+                payload?.assetData?.startsWith("<binary:") == true
+            }
+        )
+        assertTrue(
+            requests.any {
+                val payload = (it.body as? ImmichBulkMetadataBody)?.payload
+                payload?.description == "caption"
+            }
+        )
     }
 
     @Test
@@ -203,13 +217,14 @@ class UploadRequestPlannerSliceWebTest {
         val plan = ImmichRequestBuilder.buildDryRunPlan(state)
         val requests = ImmichRequestBuilder.buildPayloadInspectorRequests(plan)
         val metadataRequest = requests.first { it.url == "$IMMICH_API_BASE_URL/assets/updateAssets" }
-        val body = assertNotNull(metadataRequest.body)
+        val body = (metadataRequest.body as? ImmichBulkMetadataBody)?.payload
+        assertNotNull(body)
 
-        assertTrue(body.contains("\"timeZone\":\"+02:00\""))
+        assertEquals("+02:00", body.timeZone)
     }
 
     @Test
-    fun payloadInspectorEscapesJsonForLookupAndPayloadBodies() {
+    fun payloadInspectorPreservesLookupAndPayloadValues() {
         val requestPlan = ImmichRequestPlan(
             uploadRequests = listOf(
                 ImmichUploadRequest(
@@ -238,15 +253,21 @@ class UploadRequestPlannerSliceWebTest {
         val createTag = requests.first { it.url == "$IMMICH_API_BASE_URL/tags" }
         val upload = requests.first { it.url == "$IMMICH_API_BASE_URL/assets" }
         val metadata = requests.first { it.url == "$IMMICH_API_BASE_URL/assets/updateAssets" }
-        val uploadBody = assertNotNull(upload.body)
-        val metadataBody = assertNotNull(metadata.body)
+        val createAlbumBody = (createAlbum.body as? ImmichAlbumCreateBody)?.payload
+        val createTagBody = (createTag.body as? ImmichTagCreateBody)?.payload
+        val uploadBody = (upload.body as? ImmichUploadBody)?.payload
+        val metadataBody = (metadata.body as? ImmichBulkMetadataBody)?.payload
 
-        assertEquals("""{"name":"Fam\\"ily"}""", createAlbum.body)
-        assertEquals("""{"name":"Tri\\\\p"}""", createTag.body)
-        assertTrue(uploadBody.contains("\"deviceAssetId\":\"dev\\\"1\""))
-        assertTrue(uploadBody.contains("\"deviceId\":\"device\\\\1\""))
-        assertTrue(uploadBody.contains("\"fileName\":\"line\\nbreak\""))
-        assertTrue(metadataBody.contains("\"description\":\"quote\\\"here\""))
+        assertNotNull(createAlbumBody)
+        assertNotNull(createTagBody)
+        assertNotNull(uploadBody)
+        assertNotNull(metadataBody)
+        assertEquals("Fam\"ily", createAlbumBody.name)
+        assertEquals("Tri\\p", createTagBody.name)
+        assertEquals("dev\"1", uploadBody.deviceAssetId)
+        assertEquals("device\\1", uploadBody.deviceId)
+        assertEquals("line\nbreak", uploadBody.metadata["fileName"])
+        assertEquals("quote\"here", metadataBody.description)
     }
 
     @Test
@@ -266,11 +287,15 @@ class UploadRequestPlannerSliceWebTest {
 
         assertEquals("POST", createAlbum.method)
         assertEquals("$IMMICH_API_BASE_URL/albums", createAlbum.url)
-        assertEquals("""{"name":"Family"}""", createAlbum.body)
+        val createAlbumBody = (createAlbum.body as? ImmichAlbumCreateBody)?.payload
+        assertNotNull(createAlbumBody)
+        assertEquals("Family", createAlbumBody.name)
 
         assertEquals("POST", createTag.method)
         assertEquals("$IMMICH_API_BASE_URL/tags", createTag.url)
-        assertEquals("""{"name":"Trip"}""", createTag.body)
+        val createTagBody = (createTag.body as? ImmichTagCreateBody)?.payload
+        assertNotNull(createTagBody)
+        assertEquals("Trip", createTagBody.name)
     }
 
     @Test

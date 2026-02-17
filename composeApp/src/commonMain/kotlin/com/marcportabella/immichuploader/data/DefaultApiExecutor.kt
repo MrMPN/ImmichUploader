@@ -1,3 +1,7 @@
 package com.marcportabella.immichuploader.data
 
-expect fun defaultImmichApiExecutor(): ImmichApiExecutor
+import io.ktor.client.HttpClient
+
+expect fun defaultImmichHttpClient(): HttpClient
+
+fun defaultImmichApiExecutor(): ImmichApiExecutor = KtorImmichApiExecutor(defaultImmichHttpClient())

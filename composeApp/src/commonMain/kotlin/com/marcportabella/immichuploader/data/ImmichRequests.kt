@@ -5,7 +5,6 @@ import com.marcportabella.immichuploader.domain.FieldPatch
 import com.marcportabella.immichuploader.domain.LocalAsset
 import com.marcportabella.immichuploader.domain.UploadPrepState
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 const val IMMICH_API_BASE_URL: String = "https://fotos.marcportabella.com/api"
@@ -51,10 +50,24 @@ data class ImmichAlbumCreateRequest(val name: String)
 @Serializable
 data class ImmichTagCreateRequest(val name: String)
 
+sealed interface ImmichApiBody
+
+data class ImmichUploadBody(val payload: ImmichUploadPayload) : ImmichApiBody
+
+data class ImmichBulkMetadataBody(val payload: ImmichBulkMetadataRequest) : ImmichApiBody
+
+data class ImmichTagAssignBody(val payload: ImmichTagAssignRequest) : ImmichApiBody
+
+data class ImmichAlbumAddBody(val payload: ImmichAlbumAddRequest) : ImmichApiBody
+
+data class ImmichAlbumCreateBody(val payload: ImmichAlbumCreateRequest) : ImmichApiBody
+
+data class ImmichTagCreateBody(val payload: ImmichTagCreateRequest) : ImmichApiBody
+
 data class ImmichApiRequest(
     val method: String,
     val url: String,
-    val body: String? = null
+    val body: ImmichApiBody? = null
 )
 
 object ImmichCatalogRequestBuilder {
@@ -74,14 +87,14 @@ object ImmichCatalogRequestBuilder {
         ImmichApiRequest(
             method = "POST",
             url = "$IMMICH_API_BASE_URL/albums",
-            body = immichJson.encodeToString(ImmichAlbumCreateRequest(name.trim()))
+            body = ImmichAlbumCreateBody(ImmichAlbumCreateRequest(name.trim()))
         )
 
     fun createTag(name: String): ImmichApiRequest =
         ImmichApiRequest(
             method = "POST",
             url = "$IMMICH_API_BASE_URL/tags",
-            body = immichJson.encodeToString(ImmichTagCreateRequest(name.trim()))
+            body = ImmichTagCreateBody(ImmichTagCreateRequest(name.trim()))
         )
 }
 
@@ -237,7 +250,7 @@ object ImmichRequestBuilder {
             requests += ImmichApiRequest(
                 method = "POST",
                 url = "$IMMICH_API_BASE_URL/assets",
-                body = request.toPayloadJson()
+                body = request.toApiBody()
             )
         }
 
@@ -245,7 +258,7 @@ object ImmichRequestBuilder {
             requests += ImmichApiRequest(
                 method = "PUT",
                 url = "$IMMICH_API_BASE_URL/assets/updateAssets",
-                body = request.toPayloadJson()
+                body = request.toApiBody()
             )
         }
 
@@ -253,7 +266,7 @@ object ImmichRequestBuilder {
             requests += ImmichApiRequest(
                 method = "PUT",
                 url = "$IMMICH_API_BASE_URL/tags/assets",
-                body = request.toPayloadJson()
+                body = request.toApiBody()
             )
         }
 
@@ -261,7 +274,7 @@ object ImmichRequestBuilder {
             requests += ImmichApiRequest(
                 method = "PUT",
                 url = "$IMMICH_API_BASE_URL/albums/assets",
-                body = request.toPayloadJson()
+                body = request.toApiBody()
             )
         }
 
@@ -269,31 +282,29 @@ object ImmichRequestBuilder {
     }
 }
 
-private fun ImmichUploadRequest.toPayloadJson(): String {
-    val payload = ImmichUploadPayload(
-        assetData = "<binary:$localAssetId>",
-        deviceAssetId = deviceAssetId,
-        deviceId = deviceId,
-        fileCreatedAt = fileCreatedAt,
-        fileModifiedAt = fileModifiedAt,
-        metadata = metadata
+private fun ImmichUploadRequest.toApiBody(): ImmichUploadBody =
+    ImmichUploadBody(
+        payload = ImmichUploadPayload(
+            assetData = "<binary:$localAssetId>",
+            deviceAssetId = deviceAssetId,
+            deviceId = deviceId,
+            fileCreatedAt = fileCreatedAt,
+            fileModifiedAt = fileModifiedAt,
+            metadata = metadata
+        )
     )
-    return immichJson.encodeToString(payload)
-}
 
-private fun ImmichBulkMetadataRequest.toPayloadJson(): String {
-    val payload = copy(ids = ids.sorted())
-    return immichJson.encodeToString(payload)
-}
+private fun ImmichBulkMetadataRequest.toApiBody(): ImmichBulkMetadataBody =
+    ImmichBulkMetadataBody(payload = copy(ids = ids.sorted()))
 
-private fun ImmichTagAssignRequest.toPayloadJson(): String =
-    immichJson.encodeToString(copy(assetIds = assetIds.sorted(), tagIds = tagIds.sorted()))
+private fun ImmichTagAssignRequest.toApiBody(): ImmichTagAssignBody =
+    ImmichTagAssignBody(payload = copy(assetIds = assetIds.sorted(), tagIds = tagIds.sorted()))
 
-private fun ImmichAlbumAddRequest.toPayloadJson(): String =
-    immichJson.encodeToString(copy(assetIds = assetIds.sorted()))
+private fun ImmichAlbumAddRequest.toApiBody(): ImmichAlbumAddBody =
+    ImmichAlbumAddBody(payload = copy(assetIds = assetIds.sorted()))
 
 @Serializable
-private data class ImmichUploadPayload(
+data class ImmichUploadPayload(
     val assetData: String,
     val deviceAssetId: String,
     val deviceId: String,
