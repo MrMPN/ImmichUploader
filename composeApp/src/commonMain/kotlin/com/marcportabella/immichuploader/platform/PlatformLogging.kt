@@ -1,4 +1,8 @@
-package com.marcportabella.immichuploader.web
+package com.marcportabella.immichuploader.platform
+
+expect fun platformLogInfo(message: String)
+
+expect fun platformLogError(message: String)
 
 fun Throwable.diagnosticMessage(): String {
     val parts = mutableListOf<String>()

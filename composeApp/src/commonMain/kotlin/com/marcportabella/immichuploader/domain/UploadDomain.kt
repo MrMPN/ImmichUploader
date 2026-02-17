@@ -1,6 +1,6 @@
 package com.marcportabella.immichuploader.domain
 
-value class LocalAssetId(val value: String)
+data class LocalAssetId(val value: String)
 
 data class LocalAsset(
     val id: LocalAssetId,

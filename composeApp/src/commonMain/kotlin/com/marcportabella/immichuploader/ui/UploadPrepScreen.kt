@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeContentPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -34,12 +33,10 @@ import com.marcportabella.immichuploader.domain.UploadPrepStore
 import com.marcportabella.immichuploader.domain.canApplyBulkEdit
 import com.marcportabella.immichuploader.domain.mapLocalIntakeFilesToAssets
 import com.marcportabella.immichuploader.domain.preflightBulkEditDraft
-import com.marcportabella.immichuploader.web.revokeObjectUrl
-import com.marcportabella.immichuploader.web.toLocalIntakeFile
-import kotlinx.browser.document
+import com.marcportabella.immichuploader.platform.BindPlatformFileInput
+import com.marcportabella.immichuploader.platform.openPlatformFilePicker
+import com.marcportabella.immichuploader.platform.revokePlatformPreviewUrl
 import kotlinx.coroutines.launch
-import org.w3c.dom.HTMLInputElement
-import org.w3c.dom.events.Event
 import androidx.compose.material3.MaterialTheme
 
 @Composable
@@ -51,36 +48,12 @@ fun UploadPrepScreen(
     val scope = rememberCoroutineScope()
 
     if (enableWebEffects) {
-        DisposableEffect(store) {
-            val input = document.getElementById("local-file-input") as? HTMLInputElement
-            if (input == null) {
-                onDispose { }
-            } else {
-                val listener: (Event) -> Unit = {
-                    val fileList = input.files
-                    if (fileList != null) {
-                        scope.launch {
-                            val nextFiles = mutableListOf<com.marcportabella.immichuploader.domain.LocalIntakeFile>()
-                            for (index in 0 until fileList.length) {
-                                val file = fileList.item(index) ?: continue
-                                nextFiles += file.toLocalIntakeFile()
-                            }
-
-                            store.state.assets.values.mapNotNull { it.previewUrl }.forEach { revokeObjectUrl(it) }
-
-                            val assets = mapLocalIntakeFilesToAssets(nextFiles)
-                            store.dispatch(UploadPrepAction.ReplaceAssets(assets))
-                            store.dispatch(UploadPrepAction.ClearSelection)
-                            input.value = ""
-                        }
-                    }
-                }
-
-                input.addEventListener("change", listener)
-                onDispose {
-                    input.removeEventListener("change", listener)
-                    store.state.assets.values.mapNotNull { it.previewUrl }.forEach { revokeObjectUrl(it) }
-                }
+        BindPlatformFileInput { nextFiles ->
+            scope.launch {
+                store.state.assets.values.mapNotNull { it.previewUrl }.forEach { revokePlatformPreviewUrl(it) }
+                val assets = mapLocalIntakeFilesToAssets(nextFiles)
+                store.dispatch(UploadPrepAction.ReplaceAssets(assets))
+                store.dispatch(UploadPrepAction.ClearSelection)
             }
         }
     }
@@ -125,8 +98,7 @@ fun UploadPrepScreen(
     }
 
     val openFilePicker: () -> Unit = {
-        val input = document.getElementById("local-file-input") as? HTMLInputElement
-        input?.click()
+        openPlatformFilePicker()
         Unit
     }
 

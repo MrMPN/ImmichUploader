@@ -1,7 +1,7 @@
 package com.marcportabella.immichuploader.data
 
 class ApiImmichOnlineTransport(
-    private val executor: ImmichApiExecutor = BrowserImmichApiExecutor()
+    private val executor: ImmichApiExecutor = defaultImmichApiExecutor()
 ) : ImmichOnlineTransport {
     override suspend fun submit(plan: ImmichRequestPlan, apiKey: String): ImmichTransportResult {
         val requests = ImmichRequestBuilder.buildPayloadInspectorRequests(plan)

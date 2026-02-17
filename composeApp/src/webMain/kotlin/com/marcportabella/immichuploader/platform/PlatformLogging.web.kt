@@ -1,10 +1,10 @@
-package com.marcportabella.immichuploader.web
+package com.marcportabella.immichuploader.platform
 
-fun logInfo(message: String) {
+actual fun platformLogInfo(message: String) {
     browserConsole.log(message)
 }
 
-fun logError(message: String) {
+actual fun platformLogError(message: String) {
     browserConsole.error(message)
 }
 

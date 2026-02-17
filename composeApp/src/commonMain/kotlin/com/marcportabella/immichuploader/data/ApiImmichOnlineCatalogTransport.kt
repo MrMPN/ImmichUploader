@@ -2,11 +2,11 @@ package com.marcportabella.immichuploader.data
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
-import com.marcportabella.immichuploader.web.diagnosticMessage
-import com.marcportabella.immichuploader.web.logError
+import com.marcportabella.immichuploader.platform.diagnosticMessage
+import com.marcportabella.immichuploader.platform.platformLogError
 
 class ApiImmichOnlineCatalogTransport(
-    private val executor: ImmichApiExecutor = BrowserImmichApiExecutor()
+    private val executor: ImmichApiExecutor = defaultImmichApiExecutor()
 ) : ImmichOnlineCatalogTransport {
     override suspend fun lookupAlbums(apiKey: String): ImmichCatalogResult.Success {
         val request = ImmichCatalogRequestBuilder.lookupAlbums()
@@ -91,7 +91,7 @@ class ApiImmichOnlineCatalogTransport(
             .fold(
                 onSuccess = { ExecutionAttempt(result = it, errorMessage = null) },
                 onFailure = { throwable ->
-                    logError(
+                    platformLogError(
                         "[immichuploader][catalog] request failed: ${request.method} ${request.url} error=${throwable.diagnosticMessage()}"
                     )
                     ExecutionAttempt(
@@ -104,7 +104,7 @@ class ApiImmichOnlineCatalogTransport(
     private fun parseAlbumEntries(responseBody: String): List<ImmichCatalogEntry> =
         runCatching { immichJson.decodeFromString<List<ImmichAlbumResponse>>(responseBody) }
             .onFailure { throwable ->
-                logError("[immichuploader][catalog] album decode failed: ${throwable.diagnosticMessage()}")
+                platformLogError("[immichuploader][catalog] album decode failed: ${throwable.diagnosticMessage()}")
             }
             .getOrDefault(emptyList())
             .mapNotNull { album ->
@@ -118,7 +118,7 @@ class ApiImmichOnlineCatalogTransport(
     private fun parseTagEntries(responseBody: String): List<ImmichCatalogEntry> =
         runCatching { immichJson.decodeFromString<List<ImmichTagResponse>>(responseBody) }
             .onFailure { throwable ->
-                logError("[immichuploader][catalog] tag decode failed: ${throwable.diagnosticMessage()}")
+                platformLogError("[immichuploader][catalog] tag decode failed: ${throwable.diagnosticMessage()}")
             }
             .getOrDefault(emptyList())
             .mapNotNull { tag ->

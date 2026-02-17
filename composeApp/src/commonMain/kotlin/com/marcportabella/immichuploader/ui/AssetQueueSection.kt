@@ -22,7 +22,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -32,9 +31,9 @@ import com.marcportabella.immichuploader.domain.AssetEditPatch
 import com.marcportabella.immichuploader.domain.FieldPatch
 import com.marcportabella.immichuploader.domain.LocalAsset
 import com.marcportabella.immichuploader.domain.LocalAssetId
+import com.marcportabella.immichuploader.platform.decodePreviewBitmap
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.UtcOffset
-import org.jetbrains.skia.Image
 
 fun LazyListScope.assetQueueSection(
     selectedAssetIds: Set<LocalAssetId>,
@@ -205,7 +204,7 @@ private fun AssetPreviewThumbnail(
 ) {
     val imageBitmap = thumbnailCache.getOrPut(asset.id) {
         val bytes = asset.previewBytes ?: return@getOrPut null
-        runCatching { Image.makeFromEncoded(bytes).toComposeImageBitmap() }.getOrNull()
+        decodePreviewBitmap(bytes)
     }
 
     if (imageBitmap != null) {

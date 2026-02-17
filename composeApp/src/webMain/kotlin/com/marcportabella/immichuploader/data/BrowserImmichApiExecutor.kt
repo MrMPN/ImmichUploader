@@ -1,14 +1,14 @@
 package com.marcportabella.immichuploader.data
 
+import com.marcportabella.immichuploader.platform.platformLogInfo
 import com.marcportabella.immichuploader.web.awaitJs
-import com.marcportabella.immichuploader.web.logInfo
 import kotlin.js.JsAny
 import kotlin.js.Promise
 
 class BrowserImmichApiExecutor : ImmichApiExecutor {
     @OptIn(ExperimentalWasmJsInterop::class)
     override suspend fun execute(request: ImmichApiRequest, apiKey: String): ImmichApiExecutorResult {
-        logInfo("[immichuploader][http] -> ${request.method} ${request.url}")
+        platformLogInfo("[immichuploader][http] -> ${request.method} ${request.url}")
         val headers = createHeaders()
         headers.append("x-api-key", apiKey)
         headers.append("Accept", "application/json")
@@ -32,7 +32,7 @@ class BrowserImmichApiExecutor : ImmichApiExecutor {
 
         val responseBodyAny = response.text().awaitJs<JsAny?>()
         val responseBody = responseBodyAny?.toString() ?: ""
-        logInfo(
+        platformLogInfo(
             "[immichuploader][http] <- ${request.method} ${request.url} status=${response.status.toInt()} bodyBytes=${responseBody.length}"
         )
 
