@@ -75,6 +75,9 @@ kotlin {
             implementation(libs.logger.wasm.js)
             implementation(libs.ktor.client.js)
         }
+        wasmJsMain.dependencies {
+            implementation(npm("@js-joda/timezone", "2.22.0"))
+        }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
         }

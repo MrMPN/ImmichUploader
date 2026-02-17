@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
 
 data class BulkEditDraft(
     val includeDescription: Boolean = false,
@@ -468,7 +469,7 @@ private fun BulkEditDraft.toPatch(): AssetEditPatch? {
             FieldPatch.Unset
         },
         timeZone = if (includeTimeZone && timeZone.isNotBlank()) {
-            FieldPatch.Set(normalizeTimeZoneOffset(timeZone) ?: timeZone)
+            FieldPatch.Set(normalizeTimeZoneOffset(timeZone) ?: normalizeTimeZoneId(timeZone) ?: timeZone)
         } else {
             FieldPatch.Unset
         },
@@ -522,10 +523,13 @@ fun preflightBulkEditDraft(state: UploadPrepState): BatchFeedback? {
         )
     }
 
-    if (draft.includeTimeZone && normalizeTimeZoneOffset(draft.timeZone) == null) {
+    if (draft.includeTimeZone &&
+        normalizeTimeZoneOffset(draft.timeZone) == null &&
+        normalizeTimeZoneId(draft.timeZone) == null
+    ) {
         return BatchFeedback(
             level = BatchFeedbackLevel.Error,
-            message = "Timezone must be Z or an offset like +02:00 / -05:00."
+            message = "Timezone must be an IANA zone (e.g. Europe/Berlin) or offset like +02:00 / Z."
         )
     }
 
@@ -580,6 +584,12 @@ private fun parseTagList(value: String): Set<String> =
 private fun isIsoUtcDateTime(value: String): Boolean {
     if (!value.endsWith("Z")) return false
     return runCatching { Instant.parse(value) }.isSuccess
+}
+
+private fun normalizeTimeZoneId(value: String): String? {
+    val trimmed = value.trim()
+    if (trimmed.isEmpty()) return null
+    return runCatching { TimeZone.of(trimmed).id }.getOrNull()
 }
 
 class UploadPrepStore(initialState: UploadPrepState = UploadPrepState()) {

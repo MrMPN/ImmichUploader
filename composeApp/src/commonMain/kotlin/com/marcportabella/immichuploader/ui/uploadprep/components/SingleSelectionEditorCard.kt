@@ -75,10 +75,10 @@ internal fun SingleSelectionEditorCard(
                 label = { Text("Date/time original (ISO 8601)") },
                 modifier = Modifier.fillMaxWidth()
             )
-            OutlinedTextField(
+            TimeZoneDropdownField(
                 value = metadata.timeZone.orEmpty(),
                 onValueChange = { onPatch(AssetEditPatch(timeZone = FieldPatch.Set(it))) },
-                label = { Text("Timezone (e.g. +02:00 or Z)") },
+                label = "Timezone (IANA, +02:00, or Z)",
                 modifier = Modifier.fillMaxWidth()
             )
             OutlinedTextField(

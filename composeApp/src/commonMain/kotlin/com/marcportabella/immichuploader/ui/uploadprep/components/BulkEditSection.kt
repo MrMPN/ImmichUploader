@@ -111,10 +111,10 @@ fun BulkEditSection(
                     checked = draft.includeTimeZone,
                     onCheckedChange = { onDraftChange(draft.copy(includeTimeZone = it)) }
                 )
-                OutlinedTextField(
+                TimeZoneDropdownField(
                     value = draft.timeZone,
                     onValueChange = { onDraftChange(draft.copy(timeZone = it)) },
-                    label = { Text("Timezone (e.g. +02:00 or Z)") },
+                    label = "Timezone (IANA, +02:00, or Z)",
                     modifier = Modifier.weight(1f)
                 )
             }
