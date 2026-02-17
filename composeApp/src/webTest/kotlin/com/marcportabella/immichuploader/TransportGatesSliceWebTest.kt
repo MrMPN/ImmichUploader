@@ -49,6 +49,15 @@ class TransportGatesSliceWebTest {
                 }
                 return lookupTags(apiKey)
             }
+
+            override suspend fun bulkUploadCheck(
+                apiKey: String,
+                items: List<com.marcportabella.immichuploader.data.ImmichBulkUploadCheckItem>
+            ) = com.marcportabella.immichuploader.data.ImmichBulkUploadCheckResult.Success(
+                request = ImmichCatalogRequestBuilder.bulkUploadCheck(items),
+                existingAssetIdByItemId = emptyMap(),
+                message = "ok"
+            )
         }
         val transport = ApiKeyGatedImmichCatalogTransport(fakeTransport)
 

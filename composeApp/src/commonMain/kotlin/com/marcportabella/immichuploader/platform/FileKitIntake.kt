@@ -2,6 +2,7 @@ package com.marcportabella.immichuploader.platform
 
 import com.marcportabella.immichuploader.domain.LocalIntakeFile
 import com.marcportabella.immichuploader.domain.parseJpegExifMetadata
+import com.marcportabella.immichuploader.domain.sha1Hex
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.mimeType
 import io.github.vinceglb.filekit.name
@@ -29,6 +30,7 @@ suspend fun PlatformFile.toLocalIntakeFile(): LocalIntakeFile {
         timeZone = exifMetadata?.timeZone,
         cameraMake = exifMetadata?.cameraMake,
         cameraModel = exifMetadata?.cameraModel,
+        checksum = if (bytes.isNotEmpty()) sha1Hex(bytes) else null,
         exifMetadata = exifMetadata?.metadata ?: emptyMap(),
         exifSummary = exifMetadata
             ?.metadata

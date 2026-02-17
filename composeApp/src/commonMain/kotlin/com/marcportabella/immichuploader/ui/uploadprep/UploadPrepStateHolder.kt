@@ -7,6 +7,7 @@ import com.marcportabella.immichuploader.data.ApiImmichOnlineTransport
 import com.marcportabella.immichuploader.data.ApiKeyGatedImmichCatalogTransport
 import com.marcportabella.immichuploader.data.ApiKeyGatedImmichTransport
 import com.marcportabella.immichuploader.data.ImmichCatalogResult
+import com.marcportabella.immichuploader.data.ImmichBulkUploadCheckResult
 import com.marcportabella.immichuploader.data.ImmichTransportResult
 import com.marcportabella.immichuploader.data.toDataRequestPlan
 import com.marcportabella.immichuploader.data.toDomainCatalogEntry
@@ -21,6 +22,7 @@ import com.marcportabella.immichuploader.domain.UploadPrepStore
 import com.marcportabella.immichuploader.domain.canApplyBulkEdit
 import com.marcportabella.immichuploader.domain.mapLocalIntakeFilesToAssets
 import com.marcportabella.immichuploader.domain.preflightBulkEditDraft
+import com.marcportabella.immichuploader.platform.platformLogInfo
 import com.marcportabella.immichuploader.platform.revokePlatformPreviewUrl
 
 class UploadPrepStateHolder(
@@ -153,6 +155,58 @@ class UploadPrepStateHolder(
     fun clearExecutionStatus() = dispatch(UploadPrepAction.ClearUploadExecutionStatus)
 
     fun canApplyBulkEdit(): Boolean = canApplyBulkEdit(state)
+
+    suspend fun runDuplicateCheckForCurrentAssets() {
+        val snapshot = state
+        val items = snapshot.assets.values
+            .mapNotNull { asset ->
+                val checksum = asset.checksum ?: return@mapNotNull null
+                com.marcportabella.immichuploader.data.ImmichBulkUploadCheckItem(
+                    id = asset.id.value,
+                    checksum = checksum,
+                    originalPath = asset.fileName,
+                    relativePath = asset.fileName
+                )
+            }
+            .distinctBy { it.id }
+        platformLogInfo(
+            "[immichuploader][dedup] start assets=${snapshot.assets.size} items=${items.size} apiKeyPresent=${!apiKeyOrNull.isNullOrBlank()}"
+        )
+        if (items.isEmpty()) {
+            platformLogInfo("[immichuploader][dedup] skipped reason=no-checksums")
+            dispatch(
+                UploadPrepAction.DuplicateCheckCompleted(
+                    duplicateAssetIds = emptySet(),
+                    message = "Duplicate check skipped. No checksums available."
+                )
+            )
+            return
+        }
+
+        dispatch(UploadPrepAction.DuplicateCheckStarted)
+        when (val result = catalogTransport.bulkUploadCheck(apiKey = apiKeyOrNull, items = items)) {
+            is ImmichBulkUploadCheckResult.BlockedMissingApiKey -> {
+                platformLogInfo("[immichuploader][dedup] blocked reason=missing-api-key")
+                dispatch(UploadPrepAction.DuplicateCheckBlockedMissingApiKey(result.message))
+            }
+
+            is ImmichBulkUploadCheckResult.Success -> {
+                val duplicateAssetIds = snapshot.assets.values
+                    .filter { asset -> result.existingAssetIdByItemId.containsKey(asset.id.value) }
+                    .map { it.id }
+                    .toSet()
+                platformLogInfo(
+                    "[immichuploader][dedup] completed serverMatches=${result.existingAssetIdByItemId.size} localDuplicates=${duplicateAssetIds.size}"
+                )
+                dispatch(
+                    UploadPrepAction.DuplicateCheckCompleted(
+                        duplicateAssetIds = duplicateAssetIds,
+                        message = result.message
+                    )
+                )
+            }
+        }
+    }
 
     private fun dispatch(action: UploadPrepAction) {
         store.dispatch(action)

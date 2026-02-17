@@ -28,6 +28,19 @@ sealed interface ImmichCatalogResult {
     ) : ImmichCatalogResult
 }
 
+sealed interface ImmichBulkUploadCheckResult {
+    data class Success(
+        val request: ImmichApiRequest,
+        val existingAssetIdByItemId: Map<String, String>,
+        val message: String
+    ) : ImmichBulkUploadCheckResult
+
+    data class BlockedMissingApiKey(
+        val request: ImmichApiRequest,
+        val message: String
+    ) : ImmichBulkUploadCheckResult
+}
+
 sealed interface ImmichTransportResult {
     data class BlockedMissingApiKey(val plan: ImmichRequestPlan) : ImmichTransportResult
     data class Submitted(val requestCount: Int) : ImmichTransportResult
@@ -56,4 +69,8 @@ interface ImmichOnlineCatalogTransport {
     suspend fun lookupTags(apiKey: String): ImmichCatalogResult.Success
     suspend fun createAlbumIfMissing(apiKey: String, name: String): ImmichCatalogResult.Success
     suspend fun createTagIfMissing(apiKey: String, name: String): ImmichCatalogResult.Success
+    suspend fun bulkUploadCheck(
+        apiKey: String,
+        items: List<ImmichBulkUploadCheckItem>
+    ): ImmichBulkUploadCheckResult.Success
 }

@@ -16,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
@@ -27,11 +28,15 @@ internal fun AssetQueueTile(
     asset: LocalAsset,
     metadata: DisplayMetadata,
     isSelected: Boolean,
+    isDuplicate: Boolean,
     onToggleSelection: (LocalAssetId) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val selectable = !isDuplicate
     Card(
-        modifier = modifier.clickable { onToggleSelection(asset.id) },
+        modifier = modifier
+            .clickable(enabled = selectable) { onToggleSelection(asset.id) }
+            .alpha(if (isDuplicate) 0.55f else 1f),
         colors = CardDefaults.cardColors(
             containerColor = if (isSelected) {
                 MaterialTheme.colorScheme.secondaryContainer
@@ -58,7 +63,8 @@ internal fun AssetQueueTile(
                 )
                 Checkbox(
                     checked = isSelected,
-                    onCheckedChange = { onToggleSelection(asset.id) }
+                    onCheckedChange = { onToggleSelection(asset.id) },
+                    enabled = selectable
                 )
             }
 
@@ -84,6 +90,14 @@ internal fun AssetQueueTile(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
+
+            if (isDuplicate) {
+                Text(
+                    text = "Already on server",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }
@@ -98,6 +112,7 @@ private fun AssetQueueTilePreview(
             asset = asset,
             metadata = asset.toDisplayMetadata(previewSinglePatch()),
             isSelected = true,
+            isDuplicate = false,
             onToggleSelection = {}
         )
     }

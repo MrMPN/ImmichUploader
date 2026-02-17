@@ -4,6 +4,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import com.marcportabella.immichuploader.platform.diagnosticMessage
 import com.marcportabella.immichuploader.platform.platformLogError
+import com.marcportabella.immichuploader.platform.platformLogInfo
 
 class ApiImmichOnlineCatalogTransport(
     private val executor: ImmichApiExecutor = defaultImmichApiExecutor()
@@ -84,6 +85,39 @@ class ApiImmichOnlineCatalogTransport(
                 message = "Tag create failed with HTTP ${createResult.statusCode}."
             )
         }
+    }
+
+    override suspend fun bulkUploadCheck(
+        apiKey: String,
+        items: List<ImmichBulkUploadCheckItem>
+    ): ImmichBulkUploadCheckResult.Success {
+        platformLogInfo("[immichuploader][dedup] request items=${items.size}")
+        val request = ImmichCatalogRequestBuilder.bulkUploadCheck(items)
+        val execution = execute(request, apiKey)
+        val result = execution.result
+        val existingAssets = if (result != null && result.statusCode in 200..299) {
+            parseExistingAssetsByItemId(result.responseBody, requestedItems = items)
+        } else {
+            emptyMap()
+        }
+
+        val message = when {
+            result == null -> "Duplicate check failed before response: ${execution.errorMessage ?: "unknown network error"}"
+            result.statusCode !in 200..299 -> "Duplicate check failed with HTTP ${result.statusCode}."
+            existingAssets.isEmpty() -> "Duplicate check completed. No existing server assets detected."
+            else -> "Duplicate check completed. Found ${existingAssets.size} existing server assets."
+        }
+
+        return ImmichBulkUploadCheckResult.Success(
+            request = request,
+            existingAssetIdByItemId = existingAssets,
+            message = message
+        )
+            .also {
+                platformLogInfo(
+                    "[immichuploader][dedup] response status=${result?.statusCode ?: -1} matches=${existingAssets.size}"
+                )
+            }
     }
 
     private suspend fun execute(request: ImmichApiRequest, apiKey: String): ExecutionAttempt =

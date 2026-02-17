@@ -17,6 +17,7 @@ data class LocalIntakeFile(
     val timeZone: String? = null,
     val cameraMake: String? = null,
     val cameraModel: String? = null,
+    val checksum: String? = null,
     val exifMetadata: Map<String, String> = emptyMap(),
     val exifSummary: String? = null
 )
@@ -45,6 +46,7 @@ fun mapLocalIntakeFilesToAssets(files: List<LocalIntakeFile>): List<LocalAsset> 
             timeZone = file.timeZone,
             cameraMake = file.cameraMake,
             cameraModel = file.cameraModel,
+            checksum = file.checksum,
             exifMetadata = file.exifMetadata,
             exifSummary = file.exifSummary
         )

@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 fun QueueSelectionCard(
     hasAssets: Boolean,
     hasSelection: Boolean,
+    duplicateCheckMessage: String?,
     onOpenFilePicker: () -> Unit,
     onSelectAll: () -> Unit,
     onClearSelection: () -> Unit
@@ -43,6 +44,12 @@ fun QueueSelectionCard(
                 "Load local media, review in the explorer pane, then use the sidebar for edit details.",
                 style = MaterialTheme.typography.bodySmall
             )
+            duplicateCheckMessage?.let { message ->
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
             FlowRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -63,6 +70,7 @@ private fun QueueSelectionCardPreview() {
         QueueSelectionCard(
             hasAssets = true,
             hasSelection = true,
+            duplicateCheckMessage = "Duplicate check completed.",
             onOpenFilePicker = {},
             onSelectAll = {},
             onClearSelection = {}

@@ -27,6 +27,7 @@ class KtorImmichApiExecutor(
                     is ImmichAlbumAddBody -> setBody(body.payload)
                     is ImmichAlbumCreateBody -> setBody(body.payload)
                     is ImmichTagCreateBody -> setBody(body.payload)
+                    is ImmichBulkUploadCheckBody -> setBody(body.payload)
                 }
             }
         }
@@ -35,6 +36,12 @@ class KtorImmichApiExecutor(
         platformLogInfo(
             "[immichuploader][http] <- ${request.method} ${request.url} status=${response.status.value} bodyBytes=${responseBody.length}"
         )
+        if (response.status.value !in 200..299) {
+            val snippet = responseBody.replace('\n', ' ').take(500)
+            platformLogInfo(
+                "[immichuploader][http] !! ${request.method} ${request.url} errorBody=$snippet"
+            )
+        }
 
         return ImmichApiExecutorResult(
             statusCode = response.status.value,

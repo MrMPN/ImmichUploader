@@ -492,4 +492,52 @@ class UploadPrepReducerSliceWebTest {
 
         assertNull(next.stagedEditsByAssetId[assetId])
     }
+
+    @Test
+    fun duplicateAssetsCannotBeSelected() {
+        val a = LocalAssetId("a")
+        val b = LocalAssetId("b")
+        val state = UploadPrepState(
+            assets = mapOf(
+                a to LocalAsset(a, "a.jpg", "image/jpeg", 1, null, null, null),
+                b to LocalAsset(b, "b.jpg", "image/jpeg", 1, null, null, null)
+            ),
+            duplicateAssetIds = setOf(a)
+        )
+
+        val selected = reduceUploadPrepState(state, UploadPrepAction.SelectAll)
+        assertEquals(setOf(b), selected.selectedAssetIds)
+
+        val toggledDup = reduceUploadPrepState(selected, UploadPrepAction.ToggleSelection(a))
+        assertEquals(setOf(b), toggledDup.selectedAssetIds)
+    }
+
+    @Test
+    fun duplicateCheckCompletionPrunesSelectionAndStagedEditsForDuplicates() {
+        val duplicate = LocalAssetId("dup")
+        val keep = LocalAssetId("keep")
+        val state = UploadPrepState(
+            assets = mapOf(
+                duplicate to LocalAsset(duplicate, "dup.jpg", "image/jpeg", 1, null, null, null),
+                keep to LocalAsset(keep, "keep.jpg", "image/jpeg", 1, null, null, null)
+            ),
+            selectedAssetIds = setOf(duplicate, keep),
+            stagedEditsByAssetId = mapOf(
+                duplicate to AssetEditPatch(description = FieldPatch.Set("drop")),
+                keep to AssetEditPatch(description = FieldPatch.Set("keep"))
+            )
+        )
+
+        val next = reduceUploadPrepState(
+            state,
+            UploadPrepAction.DuplicateCheckCompleted(
+                duplicateAssetIds = setOf(duplicate),
+                message = "found dup"
+            )
+        )
+
+        assertEquals(setOf(keep), next.selectedAssetIds)
+        assertEquals(setOf(keep), next.stagedEditsByAssetId.keys)
+        assertEquals(setOf(duplicate), next.duplicateAssetIds)
+    }
 }

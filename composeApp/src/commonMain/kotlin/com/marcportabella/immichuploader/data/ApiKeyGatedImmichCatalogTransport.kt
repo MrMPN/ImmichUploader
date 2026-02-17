@@ -55,4 +55,23 @@ class ApiKeyGatedImmichCatalogTransport(
         }
         return onlineTransport.createTagIfMissing(apiKey.orEmpty(), normalized)
     }
+
+    suspend fun bulkUploadCheck(apiKey: String?, items: List<ImmichBulkUploadCheckItem>): ImmichBulkUploadCheckResult {
+        val normalized = items
+            .map { it.copy(id = it.id.trim(), checksum = it.checksum.trim()) }
+            .filter { it.id.isNotEmpty() && it.checksum.isNotEmpty() }
+            .distinctBy { it.id }
+        val request = ImmichCatalogRequestBuilder.bulkUploadCheck(normalized)
+        if (gateStatus(apiKey) == TransportGateStatus.MissingApiKey) {
+            return ImmichBulkUploadCheckResult.BlockedMissingApiKey(request, blockedMessage)
+        }
+        if (normalized.isEmpty()) {
+            return ImmichBulkUploadCheckResult.Success(
+                request = request,
+                existingAssetIdByItemId = emptyMap(),
+                message = "No checksums available for duplicate check."
+            )
+        }
+        return onlineTransport.bulkUploadCheck(apiKey.orEmpty(), normalized)
+    }
 }

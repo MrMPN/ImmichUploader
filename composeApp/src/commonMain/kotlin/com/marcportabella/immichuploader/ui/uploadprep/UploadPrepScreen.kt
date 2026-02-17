@@ -32,6 +32,14 @@ fun UploadPrepScreen(
         }
     }
 
+    if (enableWebEffects) {
+        LaunchedEffect(state.apiKey, state.assets.size) {
+            if (state.assets.isNotEmpty()) {
+                stateHolder.runDuplicateCheckForCurrentAssets()
+            }
+        }
+    }
+
     UploadPrepScreenContent(
         state = state,
         gateStatus = stateHolder.gateStatus,

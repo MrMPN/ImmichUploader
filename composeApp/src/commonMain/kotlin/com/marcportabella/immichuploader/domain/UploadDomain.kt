@@ -18,6 +18,7 @@ data class LocalAsset(
     val tagIds: Set<String> = emptySet(),
     val cameraMake: String? = null,
     val cameraModel: String? = null,
+    val checksum: String? = null,
     val exifMetadata: Map<String, String> = emptyMap(),
     val exifSummary: String? = null,
     val sourceFile: PlatformFile? = null

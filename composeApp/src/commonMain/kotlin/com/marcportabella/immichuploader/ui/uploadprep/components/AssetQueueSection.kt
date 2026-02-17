@@ -16,6 +16,7 @@ import com.marcportabella.immichuploader.domain.LocalAssetId
 
 fun LazyListScope.assetQueueSection(
     selectedAssetIds: Set<LocalAssetId>,
+    duplicateAssetIds: Set<LocalAssetId>,
     stagedEditsByAssetId: Map<LocalAssetId, AssetEditPatch>,
     sortedAssets: List<LocalAsset>,
     columns: Int,
@@ -49,6 +50,7 @@ fun LazyListScope.assetQueueSection(
                     asset = asset,
                     metadata = metadata,
                     isSelected = asset.id in selectedAssetIds,
+                    isDuplicate = asset.id in duplicateAssetIds,
                     onToggleSelection = onToggleSelection,
                     modifier = Modifier.weight(1f)
                 )

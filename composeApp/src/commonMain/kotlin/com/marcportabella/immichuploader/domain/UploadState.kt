@@ -31,6 +31,9 @@ data class UploadPrepState(
     val availableAlbums: List<UploadCatalogEntry> = emptyList(),
     val availableTags: List<UploadCatalogEntry> = emptyList(),
     val sessionTagsById: Map<String, String> = emptyMap(),
+    val duplicateAssetIds: Set<LocalAssetId> = emptySet(),
+    val duplicateCheckStatus: DuplicateCheckStatus = DuplicateCheckStatus.Idle,
+    val duplicateCheckMessage: String? = null,
     val catalogStatus: CatalogUiStatus = CatalogUiStatus.Idle,
     val catalogMessage: String? = null,
     val dryRunPlan: UploadRequestPlan? = null,
@@ -56,6 +59,13 @@ enum class BatchFeedbackLevel {
 enum class CatalogUiStatus {
     Idle,
     Loading,
+    Ready,
+    BlockedMissingApiKey
+}
+
+enum class DuplicateCheckStatus {
+    Idle,
+    Checking,
     Ready,
     BlockedMissingApiKey
 }
@@ -90,6 +100,9 @@ sealed interface UploadPrepAction {
     data class SetTagCreateDraft(val value: String) : UploadPrepAction
     data class CreateSessionTagForBulk(val name: String) : UploadPrepAction
     data class CreateSessionTagForAsset(val assetId: LocalAssetId, val name: String) : UploadPrepAction
+    data object DuplicateCheckStarted : UploadPrepAction
+    data class DuplicateCheckCompleted(val duplicateAssetIds: Set<LocalAssetId>, val message: String) : UploadPrepAction
+    data class DuplicateCheckBlockedMissingApiKey(val message: String) : UploadPrepAction
     data object CatalogRequestStarted : UploadPrepAction
     data class CatalogAlbumsLoaded(val albums: List<UploadCatalogEntry>, val message: String) : UploadPrepAction
     data class CatalogTagsLoaded(val tags: List<UploadCatalogEntry>, val message: String) : UploadPrepAction
@@ -119,6 +132,9 @@ fun reduceUploadPrepState(state: UploadPrepState, action: UploadPrepAction): Upl
                 assets = nextAssets,
                 selectedAssetIds = state.selectedAssetIds.intersect(validIds),
                 stagedEditsByAssetId = state.stagedEditsByAssetId.filterKeys { it in validIds },
+                duplicateAssetIds = emptySet(),
+                duplicateCheckStatus = DuplicateCheckStatus.Idle,
+                duplicateCheckMessage = null,
                 executionStatus = UploadExecutionStatus.Idle,
                 executionMessage = null,
                 executionRequestCount = null,
@@ -128,6 +144,7 @@ fun reduceUploadPrepState(state: UploadPrepState, action: UploadPrepAction): Upl
 
         is UploadPrepAction.ToggleSelection -> {
             if (action.assetId !in state.assets) return state
+            if (action.assetId in state.duplicateAssetIds) return state
             val nextSelection = state.selectedAssetIds.toMutableSet()
             if (!nextSelection.add(action.assetId)) {
                 nextSelection.remove(action.assetId)
@@ -136,11 +153,14 @@ fun reduceUploadPrepState(state: UploadPrepState, action: UploadPrepAction): Upl
         }
 
         is UploadPrepAction.SetSelection -> state.copy(
-            selectedAssetIds = action.assetIds.intersect(state.assets.keys),
+            selectedAssetIds = action.assetIds.intersect(state.assets.keys).filterNot { it in state.duplicateAssetIds }.toSet(),
             batchFeedback = null
         )
 
-        UploadPrepAction.SelectAll -> state.copy(selectedAssetIds = state.assets.keys, batchFeedback = null)
+        UploadPrepAction.SelectAll -> state.copy(
+            selectedAssetIds = state.assets.keys.filterNot { it in state.duplicateAssetIds }.toSet(),
+            batchFeedback = null
+        )
 
         UploadPrepAction.ClearSelection -> state.copy(selectedAssetIds = emptySet(), batchFeedback = null)
 
@@ -285,6 +305,28 @@ fun reduceUploadPrepState(state: UploadPrepState, action: UploadPrepAction): Upl
                 batchFeedback = null
             )
         }
+
+        UploadPrepAction.DuplicateCheckStarted -> state.copy(
+            duplicateCheckStatus = DuplicateCheckStatus.Checking,
+            duplicateCheckMessage = "Checking server for duplicates."
+        )
+
+        is UploadPrepAction.DuplicateCheckCompleted -> {
+            val duplicateIds = action.duplicateAssetIds.intersect(state.assets.keys)
+            state.copy(
+                duplicateAssetIds = duplicateIds,
+                duplicateCheckStatus = DuplicateCheckStatus.Ready,
+                duplicateCheckMessage = action.message,
+                selectedAssetIds = state.selectedAssetIds - duplicateIds,
+                stagedEditsByAssetId = state.stagedEditsByAssetId.filterKeys { it !in duplicateIds }
+            )
+        }
+
+        is UploadPrepAction.DuplicateCheckBlockedMissingApiKey -> state.copy(
+            duplicateAssetIds = emptySet(),
+            duplicateCheckStatus = DuplicateCheckStatus.BlockedMissingApiKey,
+            duplicateCheckMessage = action.message
+        )
 
         is UploadPrepAction.CatalogBlockedMissingApiKey -> state.copy(
             catalogStatus = CatalogUiStatus.BlockedMissingApiKey,

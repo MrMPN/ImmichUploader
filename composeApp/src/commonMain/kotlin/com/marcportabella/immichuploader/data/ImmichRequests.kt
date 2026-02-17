@@ -6,6 +6,12 @@ import com.marcportabella.immichuploader.domain.LocalAsset
 import com.marcportabella.immichuploader.domain.UploadPrepState
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 const val IMMICH_API_BASE_URL: String = "https://fotos.marcportabella.com/api"
 internal val immichJson: Json = Json {
@@ -50,6 +56,19 @@ data class ImmichAlbumCreateRequest(val name: String)
 @Serializable
 data class ImmichTagCreateRequest(val name: String)
 
+@Serializable
+data class ImmichBulkUploadCheckItem(
+    val id: String,
+    val checksum: String,
+    val originalPath: String? = null,
+    val relativePath: String? = null
+)
+
+@Serializable
+data class ImmichBulkUploadCheckRequest(
+    val assets: List<ImmichBulkUploadCheckItem>
+)
+
 sealed interface ImmichApiBody
 
 data class ImmichUploadBody(val payload: ImmichUploadPayload) : ImmichApiBody
@@ -63,6 +82,8 @@ data class ImmichAlbumAddBody(val payload: ImmichAlbumAddRequest) : ImmichApiBod
 data class ImmichAlbumCreateBody(val payload: ImmichAlbumCreateRequest) : ImmichApiBody
 
 data class ImmichTagCreateBody(val payload: ImmichTagCreateRequest) : ImmichApiBody
+
+data class ImmichBulkUploadCheckBody(val payload: ImmichBulkUploadCheckRequest) : ImmichApiBody
 
 data class ImmichApiRequest(
     val method: String,
@@ -95,6 +116,17 @@ object ImmichCatalogRequestBuilder {
             method = "POST",
             url = "$IMMICH_API_BASE_URL/tags",
             body = ImmichTagCreateBody(ImmichTagCreateRequest(name.trim()))
+        )
+
+    fun bulkUploadCheck(items: List<ImmichBulkUploadCheckItem>): ImmichApiRequest =
+        ImmichApiRequest(
+            method = "POST",
+            url = "$IMMICH_API_BASE_URL/assets/bulk-upload-check",
+            body = ImmichBulkUploadCheckBody(
+                ImmichBulkUploadCheckRequest(
+                    assets = items.distinctBy { it.id }.sortedBy { it.id }
+                )
+            )
         )
 }
 
@@ -313,6 +345,38 @@ private fun ImmichTagAssignRequest.toApiBody(): ImmichTagAssignBody =
 
 private fun ImmichAlbumAddRequest.toApiBody(): ImmichAlbumAddBody =
     ImmichAlbumAddBody(payload = copy(assetIds = assetIds.sorted()))
+
+fun parseExistingAssetsByItemId(
+    responseBody: String,
+    requestedItems: List<ImmichBulkUploadCheckItem>
+): Map<String, String> {
+    val root = runCatching { immichJson.parseToJsonElement(responseBody) }.getOrNull() ?: return emptyMap()
+
+    val existingAssets = (root as? JsonObject)
+        ?.get("existingAssets")
+        ?.jsonObject
+        ?.mapNotNull { (checksum, value) ->
+            val assetId = value.jsonPrimitive.contentOrNull?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+            checksum to assetId
+        }
+        ?.toMap()
+    if (!existingAssets.isNullOrEmpty()) {
+        val idByChecksum = requestedItems.associate { it.checksum to it.id }
+        return existingAssets.mapNotNull { (checksum, assetId) ->
+            val itemId = idByChecksum[checksum] ?: return@mapNotNull null
+            itemId to assetId
+        }.toMap()
+    }
+
+    val results = (root as? JsonObject)?.get("results") as? JsonArray ?: return emptyMap()
+    return results.mapNotNull { element ->
+        val obj = element as? JsonObject ?: return@mapNotNull null
+        val id = obj["id"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+        val assetId = obj["assetId"]?.jsonPrimitive?.contentOrNull
+            ?: return@mapNotNull null
+        id to assetId
+    }.toMap()
+}
 
 @Serializable
 data class ImmichUploadPayload(

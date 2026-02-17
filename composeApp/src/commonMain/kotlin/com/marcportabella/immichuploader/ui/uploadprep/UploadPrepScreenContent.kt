@@ -72,6 +72,8 @@ internal fun UploadPrepScreenContent(
                         assetCount = state.assets.size,
                         selectedCount = state.selectedAssetIds.size,
                         stagedCount = state.stagedEditsByAssetId.size,
+                        duplicateCount = state.duplicateAssetIds.size,
+                        duplicateStatus = state.duplicateCheckStatus.toString(),
                         gateStatus = gateStatus,
                         executionPath = executionPath,
                         catalogGateStatus = catalogGateStatus
@@ -81,6 +83,7 @@ internal fun UploadPrepScreenContent(
                     QueueSelectionCard(
                         hasAssets = state.assets.isNotEmpty(),
                         hasSelection = state.selectedAssetIds.isNotEmpty(),
+                        duplicateCheckMessage = state.duplicateCheckMessage,
                         onOpenFilePicker = onOpenFilePicker,
                         onSelectAll = onSelectAll,
                         onClearSelection = onClearSelection
@@ -88,6 +91,7 @@ internal fun UploadPrepScreenContent(
                 }
                 assetQueueSection(
                     selectedAssetIds = state.selectedAssetIds,
+                    duplicateAssetIds = state.duplicateAssetIds,
                     stagedEditsByAssetId = state.stagedEditsByAssetId,
                     sortedAssets = sortedAssets,
                     columns = 4,
@@ -148,6 +152,8 @@ internal fun UploadPrepScreenContent(
                             assetCount = state.assets.size,
                             selectedCount = state.selectedAssetIds.size,
                             stagedCount = state.stagedEditsByAssetId.size,
+                            duplicateCount = state.duplicateAssetIds.size,
+                            duplicateStatus = state.duplicateCheckStatus.toString(),
                             gateStatus = gateStatus,
                             executionPath = executionPath,
                             catalogGateStatus = catalogGateStatus
@@ -157,6 +163,7 @@ internal fun UploadPrepScreenContent(
                         QueueSelectionCard(
                             hasAssets = state.assets.isNotEmpty(),
                             hasSelection = state.selectedAssetIds.isNotEmpty(),
+                            duplicateCheckMessage = state.duplicateCheckMessage,
                             onOpenFilePicker = onOpenFilePicker,
                             onSelectAll = onSelectAll,
                             onClearSelection = onClearSelection
@@ -164,6 +171,7 @@ internal fun UploadPrepScreenContent(
                     }
                     assetQueueSection(
                         selectedAssetIds = state.selectedAssetIds,
+                        duplicateAssetIds = state.duplicateAssetIds,
                         stagedEditsByAssetId = state.stagedEditsByAssetId,
                         sortedAssets = sortedAssets,
                         columns = 5,

@@ -23,6 +23,8 @@ fun SummaryHeaderCard(
     assetCount: Int,
     selectedCount: Int,
     stagedCount: Int,
+    duplicateCount: Int,
+    duplicateStatus: String,
     gateStatus: String,
     executionPath: String,
     catalogGateStatus: String
@@ -52,6 +54,8 @@ fun SummaryHeaderCard(
                 SummaryPill("Assets", assetCount.toString())
                 SummaryPill("Selected", selectedCount.toString())
                 SummaryPill("Staged", stagedCount.toString())
+                SummaryPill("Duplicates", duplicateCount.toString())
+                SummaryPill("Dup Check", duplicateStatus)
                 SummaryPill("Transport", gateStatus)
                 SummaryPill("Execution", executionPath)
                 SummaryPill("Catalog", catalogGateStatus)
@@ -87,6 +91,8 @@ private fun SummaryHeaderCardPreview() {
             assetCount = 12,
             selectedCount = 3,
             stagedCount = 2,
+            duplicateCount = 1,
+            duplicateStatus = "Ready",
             gateStatus = PREVIEW_GATE_STATUS,
             executionPath = PREVIEW_EXECUTION_PATH,
             catalogGateStatus = PREVIEW_CATALOG_STATUS
