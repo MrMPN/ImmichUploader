@@ -148,7 +148,17 @@ class UploadPrepStateHolder(
 
     fun dismissBatchFeedback() = dispatch(UploadPrepAction.ClearBatchFeedback)
 
-    fun generatePlan() = dispatch(UploadPrepAction.GenerateDryRunPreview)
+    fun generatePlan() {
+        val before = state
+        platformLogInfo(
+            "[immichuploader][plan] generate requested selected=${before.selectedAssetIds.size} staged=${before.stagedEditsByAssetId.size}"
+        )
+        dispatch(UploadPrepAction.GenerateDryRunPreview)
+        val after = state
+        platformLogInfo(
+            "[immichuploader][plan] generate result requests=${after.dryRunApiRequests.size} message=${after.dryRunMessage ?: "<none>"}"
+        )
+    }
 
     fun clearPlan() = dispatch(UploadPrepAction.ClearDryRunPreview)
 

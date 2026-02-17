@@ -23,8 +23,8 @@ import com.marcportabella.immichuploader.domain.UploadExecutionStatus
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun RequestPlanExecutionCard(
-    hasSelection: Boolean,
     hasPlan: Boolean,
+    planMessage: String?,
     executionStatus: UploadExecutionStatus,
     executionMessage: String?,
     executionRequestCount: Int?,
@@ -55,7 +55,7 @@ fun RequestPlanExecutionCard(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Button(onClick = onGeneratePlan, enabled = hasSelection) { Text("Generate request plan") }
+                Button(onClick = onGeneratePlan) { Text("Generate request plan") }
                 Button(onClick = onClearPlan, enabled = hasPlan) { Text("Clear plan") }
                 Button(
                     onClick = onExecute,
@@ -68,6 +68,7 @@ fun RequestPlanExecutionCard(
             }
 
             HorizontalDivider()
+            if (planMessage != null) Text("Plan message: $planMessage")
             Text("Execution status: $executionStatus")
             if (executionMessage != null) Text("Execution message: $executionMessage")
             if (executionRequestCount != null) Text("Submitted requests: $executionRequestCount")
@@ -80,8 +81,8 @@ fun RequestPlanExecutionCard(
 private fun RequestPlanExecutionCardPreview() {
     MaterialTheme {
         RequestPlanExecutionCard(
-            hasSelection = true,
             hasPlan = true,
+            planMessage = "Dry-run generated 2 operations.",
             executionStatus = PREVIEW_EXECUTION_STATUS,
             executionMessage = PREVIEW_EXECUTION_MESSAGE,
             executionRequestCount = 2,

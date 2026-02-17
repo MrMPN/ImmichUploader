@@ -125,8 +125,8 @@ internal fun UploadPrepScreenContent(
                 }
                 item {
                     RequestPlanExecutionCard(
-                        hasSelection = state.selectedAssetIds.isNotEmpty(),
                         hasPlan = state.dryRunPlan != null,
+                        planMessage = state.dryRunMessage,
                         executionStatus = state.executionStatus,
                         executionMessage = state.executionMessage,
                         executionRequestCount = state.executionRequestCount,
@@ -210,8 +210,8 @@ internal fun UploadPrepScreenContent(
                     }
                     item {
                         RequestPlanExecutionCard(
-                            hasSelection = state.selectedAssetIds.isNotEmpty(),
                             hasPlan = state.dryRunPlan != null,
+                            planMessage = state.dryRunMessage,
                             executionStatus = state.executionStatus,
                             executionMessage = state.executionMessage,
                             executionRequestCount = state.executionRequestCount,
