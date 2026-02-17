@@ -33,10 +33,6 @@ canvas {
     height: 100%;
 }
 
-#local-file-input {
-    display: none;
-}
-
 #boot-loader {
     position: fixed;
     top: 50%;
