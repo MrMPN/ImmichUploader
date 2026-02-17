@@ -1,6 +1,7 @@
 *.iml
 .kotlin
 .gradle
+.gradle-local/
 **/build/
 xcuserdata
 !src/**/build/
@@ -275,3 +276,7 @@ obj/
 !/gradle/wrapper/gradle-wrapper.jar
 
 # End of https://www.toptal.com/developers/gitignore/api/kotlin,intellij,androidstudio
+
+# Generated web artifacts
+composeApp/src/webMain/kotlin/com/marcportabella/immichuploader/domain/
+composeApp/src/webMain/kotlin/com/marcportabella/immichuploader/ui/
