@@ -3,15 +3,24 @@ package com.marcportabella.immichuploader.platform
 import com.marcportabella.immichuploader.domain.LocalIntakeFile
 import com.marcportabella.immichuploader.domain.parseJpegExifMetadata
 import io.github.vinceglb.filekit.PlatformFile
+import io.github.vinceglb.filekit.mimeType
 import io.github.vinceglb.filekit.name
 import io.github.vinceglb.filekit.readBytes
 import io.github.vinceglb.filekit.size
 
 suspend fun PlatformFile.toLocalIntakeFile(): LocalIntakeFile {
-    val mimeType = inferMimeTypeFromName(name)
+    val mimeType = mimeType()?.toString()?.ifBlank { null } ?: inferMimeTypeFromName(name)
     val bytes = runCatching { readBytes() }.getOrDefault(ByteArray(0))
 
-    val previewBytes = if (mimeType.startsWith("image/")) bytes else null
+    val previewBytes = if (mimeType.startsWith("image/")) {
+        createPreviewBytes(
+            originalBytes = bytes,
+            mimeType = mimeType,
+            maxDimension = 256
+        )
+    } else {
+        null
+    }
 
     val exifMetadata = if (mimeType.equals("image/jpeg", ignoreCase = true) || mimeType.equals("image/jpg", ignoreCase = true)) {
         parseJpegExifMetadata(bytes)
