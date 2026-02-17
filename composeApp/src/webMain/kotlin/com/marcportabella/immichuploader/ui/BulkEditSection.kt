@@ -18,6 +18,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.marcportabella.immichuploader.data.ImmichCatalogEntry
 import com.marcportabella.immichuploader.domain.BulkEditDraft
@@ -201,5 +202,25 @@ fun BulkEditSection(
 
             Text("Timezone can be bulk-assigned for selected assets.")
         }
+    }
+}
+
+@Preview
+@Composable
+private fun BulkEditSectionPreview() {
+    MaterialTheme {
+        BulkEditSection(
+            draft = previewBulkDraft(),
+            selectedCount = 3,
+            applyEnabled = true,
+            preflightMessage = PREVIEW_PREFLIGHT_MESSAGE,
+            availableAlbums = previewCatalogAlbums(),
+            availableTags = previewCatalogTags(),
+            selectedTagIds = setOf("tag-1", "tag-3"),
+            onDraftChange = {},
+            onApply = {},
+            onClearDraft = {},
+            onClearSelectedStaged = {}
+        )
     }
 }

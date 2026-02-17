@@ -17,19 +17,25 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.marcportabella.immichuploader.data.ImmichCatalogEntry
 import com.marcportabella.immichuploader.domain.AssetEditPatch
 import com.marcportabella.immichuploader.domain.BulkEditDraft
 import com.marcportabella.immichuploader.domain.FieldPatch
 import com.marcportabella.immichuploader.domain.LocalAsset
 import com.marcportabella.immichuploader.domain.LocalAssetId
-import com.marcportabella.immichuploader.domain.UploadPrepState
-import com.marcportabella.immichuploader.domain.canApplyBulkEdit
 
 @Composable
 fun SelectionSidebarPane(
-    state: UploadPrepState,
     selectedAssets: List<LocalAsset>,
+    stagedEditsByAssetId: Map<LocalAssetId, AssetEditPatch>,
+    bulkDraft: BulkEditDraft,
+    selectedCount: Int,
+    applyEnabled: Boolean,
+    availableAlbums: List<ImmichCatalogEntry>,
+    availableTags: List<ImmichCatalogEntry>,
+    catalogMessage: String?,
     preflightMessage: String?,
     onSingleAssetPatch: (LocalAssetId, AssetEditPatch) -> Unit,
     onClearSingleSelectionStaged: () -> Unit,
@@ -39,7 +45,7 @@ fun SelectionSidebarPane(
     onClearSelectedStaged: () -> Unit,
     onClearCatalogMessage: () -> Unit
 ) {
-    val selectedCatalogTagIds = parseCsvIds(state.bulkEditDraft.addTagIds)
+    val selectedCatalogTagIds = parseCsvIds(bulkDraft.addTagIds)
 
     when (selectedAssets.size) {
         0 -> {
@@ -58,8 +64,8 @@ fun SelectionSidebarPane(
                     )
                     Text("No files selected.")
                     Text("Select one asset to inspect and edit metadata, or select multiple for bulk editing.")
-                    Text("Albums loaded: ${state.availableAlbums.size} | Tags loaded: ${state.availableTags.size}")
-                    state.catalogMessage?.let {
+                    Text("Albums loaded: ${availableAlbums.size} | Tags loaded: ${availableTags.size}")
+                    catalogMessage?.let {
                         Text(it, style = MaterialTheme.typography.bodySmall)
                     }
                 }
@@ -68,12 +74,12 @@ fun SelectionSidebarPane(
 
         1 -> {
             val asset = selectedAssets.first()
-            val patch = state.stagedEditsByAssetId[asset.id]
+            val patch = stagedEditsByAssetId[asset.id]
             SingleSelectionEditorCard(
                 asset = asset,
                 patch = patch,
-                availableAlbums = state.availableAlbums,
-                availableTags = state.availableTags,
+                availableAlbums = availableAlbums,
+                availableTags = availableTags,
                 onPatch = { onSingleAssetPatch(asset.id, it) },
                 onClearStaged = onClearSingleSelectionStaged
             )
@@ -98,12 +104,12 @@ fun SelectionSidebarPane(
             }
 
             BulkEditSection(
-                draft = state.bulkEditDraft,
-                selectedCount = state.selectedAssetIds.size,
-                applyEnabled = canApplyBulkEdit(state),
+                draft = bulkDraft,
+                selectedCount = selectedCount,
+                applyEnabled = applyEnabled,
                 preflightMessage = preflightMessage,
-                availableAlbums = state.availableAlbums,
-                availableTags = state.availableTags,
+                availableAlbums = availableAlbums,
+                availableTags = availableTags,
                 selectedTagIds = selectedCatalogTagIds,
                 onDraftChange = onBulkDraftChange,
                 onApply = onApplyBulk,
@@ -111,7 +117,7 @@ fun SelectionSidebarPane(
                 onClearSelectedStaged = onClearSelectedStaged
             )
 
-            state.catalogMessage?.let { message ->
+            catalogMessage?.let { message ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -265,3 +271,98 @@ private fun parseCsvIds(value: String): Set<String> =
         .map { it.trim() }
         .filter { it.isNotEmpty() }
         .toSet()
+
+@Preview
+@Composable
+private fun SelectionSidebarNoSelectionPreview() {
+    MaterialTheme {
+        SelectionSidebarPane(
+            selectedAssets = emptyList(),
+            stagedEditsByAssetId = emptyMap(),
+            bulkDraft = previewBulkDraft(),
+            selectedCount = 0,
+            applyEnabled = false,
+            availableAlbums = previewCatalogAlbums(),
+            availableTags = previewCatalogTags(),
+            catalogMessage = PREVIEW_CATALOG_MESSAGE,
+            preflightMessage = null,
+            onSingleAssetPatch = { _, _ -> },
+            onClearSingleSelectionStaged = {},
+            onBulkDraftChange = {},
+            onApplyBulk = {},
+            onClearBulkDraft = {},
+            onClearSelectedStaged = {},
+            onClearCatalogMessage = {}
+        )
+    }
+}
+
+@Preview
+@Composable
+private fun SelectionSidebarSinglePreview() {
+    val asset = previewAsset(id = "a1", name = "2016-11-08_02-43-27.jpg")
+    MaterialTheme {
+        SelectionSidebarPane(
+            selectedAssets = listOf(asset),
+            stagedEditsByAssetId = mapOf(asset.id to previewSinglePatch()),
+            bulkDraft = previewBulkDraft(),
+            selectedCount = 1,
+            applyEnabled = true,
+            availableAlbums = previewCatalogAlbums(),
+            availableTags = previewCatalogTags(),
+            catalogMessage = PREVIEW_CATALOG_MESSAGE,
+            preflightMessage = null,
+            onSingleAssetPatch = { _, _ -> },
+            onClearSingleSelectionStaged = {},
+            onBulkDraftChange = {},
+            onApplyBulk = {},
+            onClearBulkDraft = {},
+            onClearSelectedStaged = {},
+            onClearCatalogMessage = {}
+        )
+    }
+}
+
+@Preview
+@Composable
+private fun SingleSelectionEditorCardPreview() {
+    val asset = previewAsset(id = "a1", name = "2016-11-08_02-43-27.jpg")
+    MaterialTheme {
+        SingleSelectionEditorCard(
+            asset = asset,
+            patch = previewSinglePatch(),
+            availableAlbums = previewCatalogAlbums(),
+            availableTags = previewCatalogTags(),
+            onPatch = {},
+            onClearStaged = {}
+        )
+    }
+}
+
+@Preview
+@Composable
+private fun SelectionSidebarBulkPreview() {
+    MaterialTheme {
+        SelectionSidebarPane(
+            selectedAssets = listOf(
+                previewAsset(id = "a1", name = "2016-11-08_02-43-27.jpg"),
+                previewAsset(id = "a2", name = "2016-11-09_05-13-27.jpg")
+            ),
+            stagedEditsByAssetId = emptyMap(),
+            bulkDraft = previewBulkDraft(),
+            selectedCount = 2,
+            applyEnabled = true,
+            availableAlbums = previewCatalogAlbums(),
+            availableTags = previewCatalogTags(),
+            catalogMessage = PREVIEW_CATALOG_MESSAGE,
+            preflightMessage = PREVIEW_PREFLIGHT_MESSAGE,
+            onSingleAssetPatch = { _, _ -> },
+            onClearSingleSelectionStaged = {},
+            onBulkDraftChange = {},
+            onApplyBulk = {},
+            onClearBulkDraft = {},
+            onClearSelectedStaged = {},
+            onClearCatalogMessage = {}
+        )
+    }
+}

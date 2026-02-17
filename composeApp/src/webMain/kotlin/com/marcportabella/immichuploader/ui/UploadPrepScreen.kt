@@ -16,6 +16,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -24,9 +25,13 @@ import com.marcportabella.immichuploader.data.ApiImmichOnlineTransport
 import com.marcportabella.immichuploader.data.ApiKeyGatedImmichCatalogTransport
 import com.marcportabella.immichuploader.data.ApiKeyGatedImmichTransport
 import com.marcportabella.immichuploader.data.ImmichTransportResult
+import com.marcportabella.immichuploader.domain.AssetEditPatch
+import com.marcportabella.immichuploader.domain.BulkEditDraft
 import com.marcportabella.immichuploader.domain.LocalAssetId
+import com.marcportabella.immichuploader.domain.UploadPrepState
 import com.marcportabella.immichuploader.domain.UploadPrepAction
 import com.marcportabella.immichuploader.domain.UploadPrepStore
+import com.marcportabella.immichuploader.domain.canApplyBulkEdit
 import com.marcportabella.immichuploader.domain.mapLocalIntakeFilesToAssets
 import com.marcportabella.immichuploader.domain.preflightBulkEditDraft
 import com.marcportabella.immichuploader.web.revokeObjectUrl
@@ -38,39 +43,44 @@ import org.w3c.dom.events.Event
 import androidx.compose.material3.MaterialTheme
 
 @Composable
-fun UploadPrepScreen(store: UploadPrepStore) {
+fun UploadPrepScreen(
+    store: UploadPrepStore,
+    enableWebEffects: Boolean = true
+) {
     val state = store.state
     val scope = rememberCoroutineScope()
 
-    DisposableEffect(store) {
-        val input = document.getElementById("local-file-input") as? HTMLInputElement
-        if (input == null) {
-            onDispose { }
-        } else {
-            val listener: (Event) -> Unit = {
-                val fileList = input.files
-                if (fileList != null) {
-                    scope.launch {
-                        val nextFiles = mutableListOf<com.marcportabella.immichuploader.domain.LocalIntakeFile>()
-                        for (index in 0 until fileList.length) {
-                            val file = fileList.item(index) ?: continue
-                            nextFiles += file.toLocalIntakeFile()
+    if (enableWebEffects) {
+        DisposableEffect(store) {
+            val input = document.getElementById("local-file-input") as? HTMLInputElement
+            if (input == null) {
+                onDispose { }
+            } else {
+                val listener: (Event) -> Unit = {
+                    val fileList = input.files
+                    if (fileList != null) {
+                        scope.launch {
+                            val nextFiles = mutableListOf<com.marcportabella.immichuploader.domain.LocalIntakeFile>()
+                            for (index in 0 until fileList.length) {
+                                val file = fileList.item(index) ?: continue
+                                nextFiles += file.toLocalIntakeFile()
+                            }
+
+                            store.state.assets.values.mapNotNull { it.previewUrl }.forEach { revokeObjectUrl(it) }
+
+                            val assets = mapLocalIntakeFilesToAssets(nextFiles)
+                            store.dispatch(UploadPrepAction.ReplaceAssets(assets))
+                            store.dispatch(UploadPrepAction.ClearSelection)
+                            input.value = ""
                         }
-
-                        store.state.assets.values.mapNotNull { it.previewUrl }.forEach { revokeObjectUrl(it) }
-
-                        val assets = mapLocalIntakeFilesToAssets(nextFiles)
-                        store.dispatch(UploadPrepAction.ReplaceAssets(assets))
-                        store.dispatch(UploadPrepAction.ClearSelection)
-                        input.value = ""
                     }
                 }
-            }
 
-            input.addEventListener("change", listener)
-            onDispose {
-                input.removeEventListener("change", listener)
-                store.state.assets.values.mapNotNull { it.previewUrl }.forEach { revokeObjectUrl(it) }
+                input.addEventListener("change", listener)
+                onDispose {
+                    input.removeEventListener("change", listener)
+                    store.state.assets.values.mapNotNull { it.previewUrl }.forEach { revokeObjectUrl(it) }
+                }
             }
         }
     }
@@ -88,27 +98,29 @@ fun UploadPrepScreen(store: UploadPrepStore) {
     val thumbnailCache = remember { mutableMapOf<LocalAssetId, ImageBitmap?>() }
     val catalogLoadedAtInit = remember { mutableStateOf(false) }
 
-    LaunchedEffect(state.apiKey) {
-        if (catalogLoadedAtInit.value) return@LaunchedEffect
-        catalogLoadedAtInit.value = true
+    if (enableWebEffects) {
+        LaunchedEffect(state.apiKey) {
+            if (catalogLoadedAtInit.value) return@LaunchedEffect
+            catalogLoadedAtInit.value = true
 
-        store.dispatch(UploadPrepAction.CatalogRequestStarted)
-        val apiKey = state.apiKey.ifBlank { null }
+            store.dispatch(UploadPrepAction.CatalogRequestStarted)
+            val apiKey = state.apiKey.ifBlank { null }
 
-        when (val albumResult = catalogTransport.lookupAlbums(apiKey)) {
-            is com.marcportabella.immichuploader.data.ImmichCatalogResult.BlockedMissingApiKey ->
-                store.dispatch(UploadPrepAction.CatalogBlockedMissingApiKey(albumResult.message))
+            when (val albumResult = catalogTransport.lookupAlbums(apiKey)) {
+                is com.marcportabella.immichuploader.data.ImmichCatalogResult.BlockedMissingApiKey ->
+                    store.dispatch(UploadPrepAction.CatalogBlockedMissingApiKey(albumResult.message))
 
-            is com.marcportabella.immichuploader.data.ImmichCatalogResult.Success ->
-                store.dispatch(UploadPrepAction.CatalogAlbumsLoaded(albumResult.entries, albumResult.message))
-        }
+                is com.marcportabella.immichuploader.data.ImmichCatalogResult.Success ->
+                    store.dispatch(UploadPrepAction.CatalogAlbumsLoaded(albumResult.entries, albumResult.message))
+            }
 
-        when (val tagResult = catalogTransport.lookupTags(apiKey)) {
-            is com.marcportabella.immichuploader.data.ImmichCatalogResult.BlockedMissingApiKey ->
-                store.dispatch(UploadPrepAction.CatalogBlockedMissingApiKey(tagResult.message))
+            when (val tagResult = catalogTransport.lookupTags(apiKey)) {
+                is com.marcportabella.immichuploader.data.ImmichCatalogResult.BlockedMissingApiKey ->
+                    store.dispatch(UploadPrepAction.CatalogBlockedMissingApiKey(tagResult.message))
 
-            is com.marcportabella.immichuploader.data.ImmichCatalogResult.Success ->
-                store.dispatch(UploadPrepAction.CatalogTagsLoaded(tagResult.entries, tagResult.message))
+                is com.marcportabella.immichuploader.data.ImmichCatalogResult.Success ->
+                    store.dispatch(UploadPrepAction.CatalogTagsLoaded(tagResult.entries, tagResult.message))
+            }
         }
     }
 
@@ -145,6 +157,61 @@ fun UploadPrepScreen(store: UploadPrepStore) {
         Unit
     }
 
+    UploadPrepScreenContent(
+        state = state,
+        gateStatus = gateStatus.toString(),
+        executionPath = executionPath.toString(),
+        catalogGateStatus = catalogGateStatus.toString(),
+        sortedAssets = sortedAssets,
+        selectedAssets = selectedAssets,
+        bulkPreflightMessage = bulkPreflightFeedback?.message,
+        thumbnailCache = thumbnailCache,
+        onOpenFilePicker = openFilePicker,
+        onSelectAll = { store.dispatch(UploadPrepAction.SelectAll) },
+        onClearSelection = { store.dispatch(UploadPrepAction.ClearSelection) },
+        onToggleSelection = { store.dispatch(UploadPrepAction.ToggleSelection(it)) },
+        onSingleAssetPatch = { assetId, patch -> store.dispatch(UploadPrepAction.StageEditForAsset(assetId, patch)) },
+        onClearSingleSelectionStaged = { store.dispatch(UploadPrepAction.ClearStagedForSelected) },
+        onBulkDraftChange = { store.dispatch(UploadPrepAction.SetBulkEditDraft(it)) },
+        onApplyBulk = { store.dispatch(UploadPrepAction.ApplyBulkEditDraftToSelected) },
+        onClearBulkDraft = { store.dispatch(UploadPrepAction.ClearBulkEditDraft) },
+        onClearSelectedStaged = { store.dispatch(UploadPrepAction.ClearStagedForSelected) },
+        onClearCatalogMessage = { store.dispatch(UploadPrepAction.ClearCatalogMessage) },
+        onDismissBatchFeedback = { store.dispatch(UploadPrepAction.ClearBatchFeedback) },
+        onGeneratePlan = { store.dispatch(UploadPrepAction.GenerateDryRunPreview) },
+        onClearPlan = { store.dispatch(UploadPrepAction.ClearDryRunPreview) },
+        onExecute = runExecution,
+        onClearExecutionStatus = { store.dispatch(UploadPrepAction.ClearUploadExecutionStatus) }
+    )
+}
+
+@Composable
+private fun UploadPrepScreenContent(
+    state: UploadPrepState,
+    gateStatus: String,
+    executionPath: String,
+    catalogGateStatus: String,
+    sortedAssets: List<com.marcportabella.immichuploader.domain.LocalAsset>,
+    selectedAssets: List<com.marcportabella.immichuploader.domain.LocalAsset>,
+    bulkPreflightMessage: String?,
+    thumbnailCache: MutableMap<LocalAssetId, ImageBitmap?>,
+    onOpenFilePicker: () -> Unit,
+    onSelectAll: () -> Unit,
+    onClearSelection: () -> Unit,
+    onToggleSelection: (LocalAssetId) -> Unit,
+    onSingleAssetPatch: (LocalAssetId, AssetEditPatch) -> Unit,
+    onClearSingleSelectionStaged: () -> Unit,
+    onBulkDraftChange: (BulkEditDraft) -> Unit,
+    onApplyBulk: () -> Unit,
+    onClearBulkDraft: () -> Unit,
+    onClearSelectedStaged: () -> Unit,
+    onClearCatalogMessage: () -> Unit,
+    onDismissBatchFeedback: () -> Unit,
+    onGeneratePlan: () -> Unit,
+    onClearPlan: () -> Unit,
+    onExecute: () -> Unit,
+    onClearExecutionStatus: () -> Unit
+) {
     BoxWithConstraints(
         modifier = Modifier
             .background(MaterialTheme.colorScheme.background)
@@ -164,40 +231,48 @@ fun UploadPrepScreen(store: UploadPrepStore) {
                         assetCount = state.assets.size,
                         selectedCount = state.selectedAssetIds.size,
                         stagedCount = state.stagedEditsByAssetId.size,
-                        gateStatus = gateStatus.toString(),
-                        executionPath = executionPath.toString(),
-                        catalogGateStatus = catalogGateStatus.toString()
+                        gateStatus = gateStatus,
+                        executionPath = executionPath,
+                        catalogGateStatus = catalogGateStatus
                     )
                 }
                 item {
                     QueueSelectionCard(
-                        state = state,
-                        onOpenFilePicker = openFilePicker,
-                        onSelectAll = { store.dispatch(UploadPrepAction.SelectAll) },
-                        onClearSelection = { store.dispatch(UploadPrepAction.ClearSelection) }
+                        hasAssets = state.assets.isNotEmpty(),
+                        hasSelection = state.selectedAssetIds.isNotEmpty(),
+                        onOpenFilePicker = onOpenFilePicker,
+                        onSelectAll = onSelectAll,
+                        onClearSelection = onClearSelection
                     )
                 }
 
                 assetQueueSection(
-                    state = state,
+                    selectedAssetIds = state.selectedAssetIds,
+                    stagedEditsByAssetId = state.stagedEditsByAssetId,
                     sortedAssets = sortedAssets,
                     thumbnailCache = thumbnailCache,
                     columns = 4,
-                    onToggleSelection = { store.dispatch(UploadPrepAction.ToggleSelection(it)) }
+                    onToggleSelection = onToggleSelection
                 )
 
                 item {
                     SelectionSidebarPane(
-                        state = state,
                         selectedAssets = selectedAssets,
-                        preflightMessage = bulkPreflightFeedback?.message,
-                        onSingleAssetPatch = { assetId, patch -> store.dispatch(UploadPrepAction.StageEditForAsset(assetId, patch)) },
-                        onClearSingleSelectionStaged = { store.dispatch(UploadPrepAction.ClearStagedForSelected) },
-                        onBulkDraftChange = { store.dispatch(UploadPrepAction.SetBulkEditDraft(it)) },
-                        onApplyBulk = { store.dispatch(UploadPrepAction.ApplyBulkEditDraftToSelected) },
-                        onClearBulkDraft = { store.dispatch(UploadPrepAction.ClearBulkEditDraft) },
-                        onClearSelectedStaged = { store.dispatch(UploadPrepAction.ClearStagedForSelected) },
-                        onClearCatalogMessage = { store.dispatch(UploadPrepAction.ClearCatalogMessage) }
+                        stagedEditsByAssetId = state.stagedEditsByAssetId,
+                        bulkDraft = state.bulkEditDraft,
+                        selectedCount = state.selectedAssetIds.size,
+                        applyEnabled = canApplyBulkEdit(state),
+                        availableAlbums = state.availableAlbums,
+                        availableTags = state.availableTags,
+                        catalogMessage = state.catalogMessage,
+                        preflightMessage = bulkPreflightMessage,
+                        onSingleAssetPatch = onSingleAssetPatch,
+                        onClearSingleSelectionStaged = onClearSingleSelectionStaged,
+                        onBulkDraftChange = onBulkDraftChange,
+                        onApplyBulk = onApplyBulk,
+                        onClearBulkDraft = onClearBulkDraft,
+                        onClearSelectedStaged = onClearSelectedStaged,
+                        onClearCatalogMessage = onClearCatalogMessage
                     )
                 }
 
@@ -205,22 +280,32 @@ fun UploadPrepScreen(store: UploadPrepStore) {
                     item {
                         BatchFeedbackBanner(
                             feedback = state.batchFeedback,
-                            onDismiss = { store.dispatch(UploadPrepAction.ClearBatchFeedback) }
+                            onDismiss = onDismissBatchFeedback
                         )
                     }
                 }
 
                 item {
                     RequestPlanExecutionCard(
-                        state = state,
-                        onGeneratePlan = { store.dispatch(UploadPrepAction.GenerateDryRunPreview) },
-                        onClearPlan = { store.dispatch(UploadPrepAction.ClearDryRunPreview) },
-                        onExecute = runExecution,
-                        onClearExecutionStatus = { store.dispatch(UploadPrepAction.ClearUploadExecutionStatus) }
+                        hasSelection = state.selectedAssetIds.isNotEmpty(),
+                        hasPlan = state.dryRunPlan != null,
+                        executionStatus = state.executionStatus,
+                        executionMessage = state.executionMessage,
+                        executionRequestCount = state.executionRequestCount,
+                        onGeneratePlan = onGeneratePlan,
+                        onClearPlan = onClearPlan,
+                        onExecute = onExecute,
+                        onClearExecutionStatus = onClearExecutionStatus
                     )
                 }
 
-                item { DryRunInspectorSection(state) }
+                item {
+                    DryRunInspectorSection(
+                        plan = state.dryRunPlan,
+                        requests = state.dryRunApiRequests,
+                        message = state.dryRunMessage
+                    )
+                }
             }
         } else {
             Row(
@@ -240,25 +325,27 @@ fun UploadPrepScreen(store: UploadPrepStore) {
                             assetCount = state.assets.size,
                             selectedCount = state.selectedAssetIds.size,
                             stagedCount = state.stagedEditsByAssetId.size,
-                            gateStatus = gateStatus.toString(),
-                            executionPath = executionPath.toString(),
-                            catalogGateStatus = catalogGateStatus.toString()
+                            gateStatus = gateStatus,
+                            executionPath = executionPath,
+                            catalogGateStatus = catalogGateStatus
                         )
                     }
                     item {
                         QueueSelectionCard(
-                            state = state,
-                            onOpenFilePicker = openFilePicker,
-                            onSelectAll = { store.dispatch(UploadPrepAction.SelectAll) },
-                            onClearSelection = { store.dispatch(UploadPrepAction.ClearSelection) }
+                            hasAssets = state.assets.isNotEmpty(),
+                            hasSelection = state.selectedAssetIds.isNotEmpty(),
+                            onOpenFilePicker = onOpenFilePicker,
+                            onSelectAll = onSelectAll,
+                            onClearSelection = onClearSelection
                         )
                     }
                     assetQueueSection(
-                        state = state,
+                        selectedAssetIds = state.selectedAssetIds,
+                        stagedEditsByAssetId = state.stagedEditsByAssetId,
                         sortedAssets = sortedAssets,
                         thumbnailCache = thumbnailCache,
                         columns = 5,
-                        onToggleSelection = { store.dispatch(UploadPrepAction.ToggleSelection(it)) }
+                        onToggleSelection = onToggleSelection
                     )
                 }
 
@@ -270,38 +357,130 @@ fun UploadPrepScreen(store: UploadPrepStore) {
                 ) {
                     item {
                         SelectionSidebarPane(
-                            state = state,
                             selectedAssets = selectedAssets,
-                            preflightMessage = bulkPreflightFeedback?.message,
-                            onSingleAssetPatch = { assetId, patch -> store.dispatch(UploadPrepAction.StageEditForAsset(assetId, patch)) },
-                            onClearSingleSelectionStaged = { store.dispatch(UploadPrepAction.ClearStagedForSelected) },
-                            onBulkDraftChange = { store.dispatch(UploadPrepAction.SetBulkEditDraft(it)) },
-                            onApplyBulk = { store.dispatch(UploadPrepAction.ApplyBulkEditDraftToSelected) },
-                            onClearBulkDraft = { store.dispatch(UploadPrepAction.ClearBulkEditDraft) },
-                            onClearSelectedStaged = { store.dispatch(UploadPrepAction.ClearStagedForSelected) },
-                            onClearCatalogMessage = { store.dispatch(UploadPrepAction.ClearCatalogMessage) }
+                            stagedEditsByAssetId = state.stagedEditsByAssetId,
+                            bulkDraft = state.bulkEditDraft,
+                            selectedCount = state.selectedAssetIds.size,
+                            applyEnabled = canApplyBulkEdit(state),
+                            availableAlbums = state.availableAlbums,
+                            availableTags = state.availableTags,
+                            catalogMessage = state.catalogMessage,
+                            preflightMessage = bulkPreflightMessage,
+                            onSingleAssetPatch = onSingleAssetPatch,
+                            onClearSingleSelectionStaged = onClearSingleSelectionStaged,
+                            onBulkDraftChange = onBulkDraftChange,
+                            onApplyBulk = onApplyBulk,
+                            onClearBulkDraft = onClearBulkDraft,
+                            onClearSelectedStaged = onClearSelectedStaged,
+                            onClearCatalogMessage = onClearCatalogMessage
                         )
                     }
                     if (state.batchFeedback != null) {
                         item {
                             BatchFeedbackBanner(
                                 feedback = state.batchFeedback,
-                                onDismiss = { store.dispatch(UploadPrepAction.ClearBatchFeedback) }
+                                onDismiss = onDismissBatchFeedback
                             )
                         }
                     }
                     item {
                         RequestPlanExecutionCard(
-                            state = state,
-                            onGeneratePlan = { store.dispatch(UploadPrepAction.GenerateDryRunPreview) },
-                            onClearPlan = { store.dispatch(UploadPrepAction.ClearDryRunPreview) },
-                            onExecute = runExecution,
-                            onClearExecutionStatus = { store.dispatch(UploadPrepAction.ClearUploadExecutionStatus) }
+                            hasSelection = state.selectedAssetIds.isNotEmpty(),
+                            hasPlan = state.dryRunPlan != null,
+                            executionStatus = state.executionStatus,
+                            executionMessage = state.executionMessage,
+                            executionRequestCount = state.executionRequestCount,
+                            onGeneratePlan = onGeneratePlan,
+                            onClearPlan = onClearPlan,
+                            onExecute = onExecute,
+                            onClearExecutionStatus = onClearExecutionStatus
                         )
                     }
-                    item { DryRunInspectorSection(state) }
+                    item {
+                        DryRunInspectorSection(
+                            plan = state.dryRunPlan,
+                            requests = state.dryRunApiRequests,
+                            message = state.dryRunMessage
+                        )
+                    }
                 }
             }
         }
+    }
+}
+
+@Preview
+@Composable
+private fun UploadPrepScreenContentPreview() {
+    val a1 = previewAsset("a1", "2016-11-08_02-43-27.jpg")
+    val a2 = previewAsset("a2", "2016-11-08_04-12-10.jpg")
+    val previewState = UploadPrepState(
+        assets = listOf(a1, a2).associateBy { it.id },
+        selectedAssetIds = setOf(a1.id, a2.id),
+        stagedEditsByAssetId = mapOf(a1.id to previewSinglePatch()),
+        bulkEditDraft = previewBulkDraft(),
+        availableAlbums = previewCatalogAlbums(),
+        availableTags = previewCatalogTags(),
+        catalogMessage = PREVIEW_CATALOG_MESSAGE,
+        dryRunPlan = previewPlan(),
+        dryRunApiRequests = previewRequests(),
+        dryRunMessage = "Dry-run generated 2 operations.",
+        executionStatus = PREVIEW_EXECUTION_STATUS,
+        executionMessage = PREVIEW_EXECUTION_MESSAGE,
+        executionRequestCount = 2,
+        batchFeedback = previewFeedback()
+    )
+    MaterialTheme {
+        UploadPrepScreenContent(
+            state = previewState,
+            gateStatus = PREVIEW_GATE_STATUS,
+            executionPath = PREVIEW_EXECUTION_PATH,
+            catalogGateStatus = PREVIEW_CATALOG_STATUS,
+            sortedAssets = listOf(a1, a2),
+            selectedAssets = listOf(a1, a2),
+            bulkPreflightMessage = PREVIEW_PREFLIGHT_MESSAGE,
+            thumbnailCache = mutableMapOf(),
+            onOpenFilePicker = {},
+            onSelectAll = {},
+            onClearSelection = {},
+            onToggleSelection = {},
+            onSingleAssetPatch = { _, _ -> },
+            onClearSingleSelectionStaged = {},
+            onBulkDraftChange = {},
+            onApplyBulk = {},
+            onClearBulkDraft = {},
+            onClearSelectedStaged = {},
+            onClearCatalogMessage = {},
+            onDismissBatchFeedback = {},
+            onGeneratePlan = {},
+            onClearPlan = {},
+            onExecute = {},
+            onClearExecutionStatus = {}
+        )
+    }
+}
+
+@Preview
+@Composable
+private fun UploadPrepScreenRoutePreview() {
+    val a1 = previewAsset("a1", "2016-11-08_02-43-27.jpg")
+    val a2 = previewAsset("a2", "2016-11-08_04-12-10.jpg")
+    val previewStore = UploadPrepStore(
+        UploadPrepState(
+            assets = listOf(a1, a2).associateBy { it.id },
+            selectedAssetIds = setOf(a1.id),
+            stagedEditsByAssetId = mapOf(a1.id to previewSinglePatch()),
+            bulkEditDraft = previewBulkDraft(),
+            availableAlbums = previewCatalogAlbums(),
+            availableTags = previewCatalogTags(),
+            dryRunApiRequests = previewRequests(),
+            dryRunMessage = "Dry-run generated 2 operations."
+        )
+    )
+    MaterialTheme {
+        UploadPrepScreen(
+            store = previewStore,
+            enableWebEffects = false
+        )
     }
 }

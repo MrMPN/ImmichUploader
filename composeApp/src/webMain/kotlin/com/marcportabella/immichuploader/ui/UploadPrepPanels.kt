@@ -17,9 +17,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.marcportabella.immichuploader.domain.UploadExecutionStatus
-import com.marcportabella.immichuploader.domain.UploadPrepState
 
 @Composable
 fun SummaryHeaderCard(
@@ -66,7 +66,8 @@ fun SummaryHeaderCard(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun QueueSelectionCard(
-    state: UploadPrepState,
+    hasAssets: Boolean,
+    hasSelection: Boolean,
     onOpenFilePicker: () -> Unit,
     onSelectAll: () -> Unit,
     onClearSelection: () -> Unit
@@ -98,13 +99,13 @@ fun QueueSelectionCard(
                 }
                 Button(
                     onClick = onSelectAll,
-                    enabled = state.assets.isNotEmpty()
+                    enabled = hasAssets
                 ) {
                     Text("Select all")
                 }
                 Button(
                     onClick = onClearSelection,
-                    enabled = state.selectedAssetIds.isNotEmpty()
+                    enabled = hasSelection
                 ) {
                     Text("Clear selection")
                 }
@@ -116,7 +117,11 @@ fun QueueSelectionCard(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun RequestPlanExecutionCard(
-    state: UploadPrepState,
+    hasSelection: Boolean,
+    hasPlan: Boolean,
+    executionStatus: UploadExecutionStatus,
+    executionMessage: String?,
+    executionRequestCount: Int?,
     onGeneratePlan: () -> Unit,
     onClearPlan: () -> Unit,
     onExecute: () -> Unit,
@@ -148,37 +153,37 @@ fun RequestPlanExecutionCard(
             ) {
                 Button(
                     onClick = onGeneratePlan,
-                    enabled = state.selectedAssetIds.isNotEmpty()
+                    enabled = hasSelection
                 ) {
                     Text("Generate request plan")
                 }
                 Button(
                     onClick = onClearPlan,
-                    enabled = state.dryRunPlan != null
+                    enabled = hasPlan
                 ) {
                     Text("Clear plan")
                 }
                 Button(
                     onClick = onExecute,
-                    enabled = state.dryRunPlan != null && state.executionStatus != UploadExecutionStatus.Executing
+                    enabled = hasPlan && executionStatus != UploadExecutionStatus.Executing
                 ) {
                     Text("Execute API upload")
                 }
                 Button(
                     onClick = onClearExecutionStatus,
-                    enabled = state.executionMessage != null || state.executionStatus != UploadExecutionStatus.Idle
+                    enabled = executionMessage != null || executionStatus != UploadExecutionStatus.Idle
                 ) {
                     Text("Clear execution status")
                 }
             }
 
             HorizontalDivider()
-            Text("Execution status: ${state.executionStatus}")
-            if (state.executionMessage != null) {
-                Text("Execution message: ${state.executionMessage}")
+            Text("Execution status: $executionStatus")
+            if (executionMessage != null) {
+                Text("Execution message: $executionMessage")
             }
-            if (state.executionRequestCount != null) {
-                Text("Submitted requests: ${state.executionRequestCount}")
+            if (executionRequestCount != null) {
+                Text("Submitted requests: $executionRequestCount")
             }
         }
     }
@@ -200,5 +205,60 @@ private fun SummaryPill(label: String, value: String) {
                 fontWeight = FontWeight.SemiBold
             )
         }
+    }
+}
+
+@Preview
+@Composable
+private fun SummaryHeaderCardPreview() {
+    MaterialTheme {
+        SummaryHeaderCard(
+            assetCount = 12,
+            selectedCount = 3,
+            stagedCount = 2,
+            gateStatus = PREVIEW_GATE_STATUS,
+            executionPath = PREVIEW_EXECUTION_PATH,
+            catalogGateStatus = PREVIEW_CATALOG_STATUS
+        )
+    }
+}
+
+@Preview
+@Composable
+private fun QueueSelectionCardPreview() {
+    MaterialTheme {
+        QueueSelectionCard(
+            hasAssets = true,
+            hasSelection = true,
+            onOpenFilePicker = {},
+            onSelectAll = {},
+            onClearSelection = {}
+        )
+    }
+}
+
+@Preview
+@Composable
+private fun RequestPlanExecutionCardPreview() {
+    MaterialTheme {
+        RequestPlanExecutionCard(
+            hasSelection = true,
+            hasPlan = true,
+            executionStatus = PREVIEW_EXECUTION_STATUS,
+            executionMessage = PREVIEW_EXECUTION_MESSAGE,
+            executionRequestCount = 2,
+            onGeneratePlan = {},
+            onClearPlan = {},
+            onExecute = {},
+            onClearExecutionStatus = {}
+        )
+    }
+}
+
+@Preview
+@Composable
+private fun SummaryPillPreview() {
+    MaterialTheme {
+        SummaryPill(label = "Assets", value = "12")
     }
 }

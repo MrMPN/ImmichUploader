@@ -12,14 +12,17 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.marcportabella.immichuploader.domain.UploadPrepState
+import com.marcportabella.immichuploader.data.ImmichApiRequest
+import com.marcportabella.immichuploader.data.ImmichRequestPlan
 
 @Composable
-fun DryRunInspectorSection(state: UploadPrepState) {
-    val plan = state.dryRunPlan
-    val requests = state.dryRunApiRequests
-
+fun DryRunInspectorSection(
+    plan: ImmichRequestPlan?,
+    requests: List<ImmichApiRequest>,
+    message: String?
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -45,8 +48,8 @@ fun DryRunInspectorSection(state: UploadPrepState) {
                 Text("Lookup hooks: ${plan.lookupHooks.size}")
             }
 
-            if (state.dryRunMessage != null) {
-                Text(state.dryRunMessage)
+            if (message != null) {
+                Text(message)
             }
 
             if (requests.isEmpty()) {
@@ -70,5 +73,17 @@ fun DryRunInspectorSection(state: UploadPrepState) {
                 }
             }
         }
+    }
+}
+
+@Preview
+@Composable
+private fun DryRunInspectorSectionPreview() {
+    MaterialTheme {
+        DryRunInspectorSection(
+            plan = previewPlan(),
+            requests = previewRequests(),
+            message = "Dry-run generated 2 operations."
+        )
     }
 }

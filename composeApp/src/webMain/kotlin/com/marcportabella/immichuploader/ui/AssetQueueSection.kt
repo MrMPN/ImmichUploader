@@ -26,18 +26,19 @@ import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.marcportabella.immichuploader.domain.AssetEditPatch
 import com.marcportabella.immichuploader.domain.FieldPatch
 import com.marcportabella.immichuploader.domain.LocalAsset
 import com.marcportabella.immichuploader.domain.LocalAssetId
-import com.marcportabella.immichuploader.domain.UploadPrepState
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.UtcOffset
 import org.jetbrains.skia.Image
 
 fun LazyListScope.assetQueueSection(
-    state: UploadPrepState,
+    selectedAssetIds: Set<LocalAssetId>,
+    stagedEditsByAssetId: Map<LocalAssetId, AssetEditPatch>,
     sortedAssets: List<LocalAsset>,
     thumbnailCache: MutableMap<LocalAssetId, ImageBitmap?>,
     columns: Int,
@@ -65,12 +66,12 @@ fun LazyListScope.assetQueueSection(
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             rowAssets.forEach { asset ->
-                val patch = state.stagedEditsByAssetId[asset.id]
+                val patch = stagedEditsByAssetId[asset.id]
                 val metadata = asset.toDisplayMetadata(patch)
                 AssetQueueTile(
                     asset = asset,
                     metadata = metadata,
-                    isSelected = asset.id in state.selectedAssetIds,
+                    isSelected = asset.id in selectedAssetIds,
                     thumbnailCache = thumbnailCache,
                     onToggleSelection = onToggleSelection,
                     modifier = Modifier.weight(1f)
@@ -80,6 +81,49 @@ fun LazyListScope.assetQueueSection(
                 Spacer(modifier = Modifier.weight(1f))
             }
         }
+    }
+}
+
+@Preview
+@Composable
+private fun AssetQueueTilePreview() {
+    val asset = previewAsset(id = "a1", name = "2016-11-08_02-43-27.jpg")
+    MaterialTheme {
+        AssetQueueTile(
+            asset = asset,
+            metadata = asset.toDisplayMetadata(previewSinglePatch()),
+            isSelected = true,
+            thumbnailCache = mutableMapOf(),
+            onToggleSelection = {}
+        )
+    }
+}
+
+@Preview
+@Composable
+private fun AssetPreviewThumbnailPreview() {
+    val asset = previewAsset(id = "a1", name = "2016-11-08_02-43-27.jpg")
+    MaterialTheme {
+        AssetPreviewThumbnail(
+            asset = asset,
+            thumbnailCache = mutableMapOf(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(1.4f)
+        )
+    }
+}
+
+@Preview
+@Composable
+private fun PreviewDisabledPlaceholderPreview() {
+    MaterialTheme {
+        PreviewDisabledPlaceholder(
+            mimeType = "image/jpeg",
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(1.4f)
+        )
     }
 }
 
