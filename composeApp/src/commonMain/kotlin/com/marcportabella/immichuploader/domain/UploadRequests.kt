@@ -356,7 +356,7 @@ private fun toExifDateTime(xmpTimestamp: String): String? {
 }
 
 private fun withTimezoneOffsetIfMissing(dateTime: String, timeZone: String?): String {
-    val trimmedDateTime = dateTime.trim()
+    val trimmedDateTime = normalizeIsoDateTime(dateTime.trim())
     if (trimmedDateTime.endsWith("Z") || OFFSET_SUFFIX_REGEX.containsMatchIn(trimmedDateTime)) return trimmedDateTime
     val normalizedTimeZone = timeZone?.trim()?.takeIf { it.isNotEmpty() } ?: return trimmedDateTime
     if (normalizedTimeZone == "Z" || OFFSET_ONLY_REGEX.matches(normalizedTimeZone)) {
@@ -377,6 +377,8 @@ private fun withTimezoneOffsetIfMissing(dateTime: String, timeZone: String?): St
 
 private val OFFSET_SUFFIX_REGEX = Regex("[+-](?:[01]\\d|2[0-3]):[0-5]\\d$")
 private val OFFSET_ONLY_REGEX = Regex("^[+-](?:[01]\\d|2[0-3]):[0-5]\\d$")
+private val ISO_MINUTE_PRECISION_REGEX =
+    Regex("^(\\d{4}-\\d{2}-\\d{2})T(\\d{2}):(\\d{2})(?::(\\d{2}))?(Z|[+-]\\d{2}:\\d{2})?$")
 private val ISO_TIMESTAMP_REGEX =
     Regex("^(\\d{4})-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2}):(\\d{2})(Z|[+-]\\d{2}:\\d{2})?$")
 private val XMP_TIMESTAMP_REGEX =
@@ -385,6 +387,16 @@ private val XMP_TIMESTAMP_REGEX =
 private fun extractOffsetFromXmpDateTime(value: String): String? {
     val zone = value.takeLast(6)
     return if (OFFSET_ONLY_REGEX.matches(zone)) zone else null
+}
+
+private fun normalizeIsoDateTime(value: String): String {
+    val match = ISO_MINUTE_PRECISION_REGEX.matchEntire(value) ?: return value
+    val datePart = match.groupValues[1]
+    val hour = match.groupValues[2]
+    val minute = match.groupValues[3]
+    val second = match.groupValues[4].ifBlank { "00" }
+    val zone = match.groupValues[5]
+    return "$datePart" + "T" + "$hour:$minute:$second$zone"
 }
 
 @Serializable
