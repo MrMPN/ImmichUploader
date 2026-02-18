@@ -1,9 +1,13 @@
 package com.marcportabella.immichuploader.data
 
+import com.marcportabella.immichuploader.platform.platformLogInfo
+import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 
 class ApiImmichOnlineTransport(
     private val executor: ImmichApiExecutor = defaultImmichApiExecutor()
@@ -12,25 +16,188 @@ class ApiImmichOnlineTransport(
         val resolvedPlan = resolveSessionTagIds(plan = plan, apiKey = apiKey) ?: return ImmichTransportResult.Failed(
             "Failed to resolve one or more session tags before upload."
         )
-        val requests = ImmichRequestBuilder.buildPayloadInspectorRequests(resolvedPlan)
-        requests.forEachIndexed { index, request ->
-            val result = runCatching {
-                executor.execute(request = request, apiKey = apiKey)
-            }.getOrElse { throwable ->
-                val message = throwable.message ?: "Unknown transport failure"
-                return ImmichTransportResult.Failed(
-                    "Request ${index + 1} failed before response: $message"
-                )
-            }
+        val missingSource = resolvedPlan.uploadRequests.firstOrNull { it.sourceFile == null }
+        if (missingSource != null) {
+            return ImmichTransportResult.Failed(
+                "Upload request for local asset ${missingSource.localAssetId} has no source file attached."
+            )
+        }
+        var executedRequestCount = 0
 
+        resolvedPlan.lookupHooks.forEach { hook ->
+            val request = when (hook) {
+                ImmichLookupHook.LookupAlbums -> ImmichCatalogRequestBuilder.lookupAlbums()
+                ImmichLookupHook.LookupTags -> ImmichCatalogRequestBuilder.lookupTags()
+                is ImmichLookupHook.CreateAlbumIfMissing -> ImmichCatalogRequestBuilder.createAlbum(hook.name)
+                is ImmichLookupHook.CreateTagIfMissing -> ImmichCatalogRequestBuilder.createTag(hook.name)
+            }
+            val result = runRequestOrFail(request = request, requestOrdinal = executedRequestCount + 1, apiKey = apiKey)
+            executedRequestCount++
             if (result.statusCode !in 200..299) {
-                return ImmichTransportResult.Failed(
-                    "Request ${index + 1} failed with HTTP ${result.statusCode} (${request.method} ${request.url})."
-                )
+                return ImmichTransportResult.Failed(result.responseBody)
             }
         }
 
-        return ImmichTransportResult.Submitted(requests.size)
+        val remoteAssetIdByPlaceholder = mutableMapOf<String, String>()
+        resolvedPlan.uploadRequests.forEach { upload ->
+            val request = ImmichApiRequest(
+                method = "POST",
+                url = "$IMMICH_API_BASE_URL/assets",
+                body = ImmichUploadBody(
+                    payload = ImmichUploadPayload(
+                        localAssetId = upload.localAssetId,
+                        fileName = upload.fileName,
+                        mimeType = upload.mimeType,
+                        sourceFile = upload.sourceFile,
+                        deviceAssetId = upload.deviceAssetId,
+                        deviceId = upload.deviceId,
+                        fileCreatedAt = upload.fileCreatedAt,
+                        fileModifiedAt = upload.fileModifiedAt
+                    )
+                )
+            )
+            val result = runRequestOrFail(request = request, requestOrdinal = executedRequestCount + 1, apiKey = apiKey)
+            executedRequestCount++
+            if (result.statusCode !in 200..299) {
+                return ImmichTransportResult.Failed(result.responseBody)
+            }
+
+            val remoteAssetId = extractUploadedAssetId(result.responseBody)
+            if (remoteAssetId.isNullOrBlank()) {
+                return ImmichTransportResult.Failed(
+                    "Upload response missing asset id for local asset ${upload.localAssetId}."
+                )
+            }
+            remoteAssetIdByPlaceholder["remote-${upload.localAssetId}"] = remoteAssetId
+            platformLogInfo(
+                "[immichuploader][exec] uploaded local=${upload.localAssetId} -> remote=$remoteAssetId"
+            )
+        }
+
+        val resolvedBulkMetadataRequests = resolvedPlan.bulkMetadataRequests.map { request ->
+            val resolvedIds = request.ids.map { id -> remoteAssetIdByPlaceholder[id] ?: id }
+            request.copy(ids = resolvedIds)
+        }
+        val resolvedTagAssignRequests = resolvedPlan.tagAssignRequests.map { request ->
+            val resolvedAssetIds = request.assetIds.map { id -> remoteAssetIdByPlaceholder[id] ?: id }
+            request.copy(assetIds = resolvedAssetIds)
+        }
+        val resolvedAlbumAddRequests = resolvedPlan.albumAddRequests.map { request ->
+            val resolvedAssetIds = request.assetIds.map { id -> remoteAssetIdByPlaceholder[id] ?: id }
+            request.copy(assetIds = resolvedAssetIds)
+        }
+
+        if (containsPlaceholderMetadataId(resolvedBulkMetadataRequests) ||
+            containsPlaceholderTagAssetId(resolvedTagAssignRequests) ||
+            containsPlaceholderAlbumAssetId(resolvedAlbumAddRequests)
+        ) {
+            return ImmichTransportResult.Failed(
+                "Failed to resolve one or more uploaded asset IDs before metadata/tag/album requests."
+            )
+        }
+
+        val immediateMetadataRequests = mutableListOf<ImmichBulkMetadataRequest>()
+        val deferredTimezoneRequests = mutableListOf<ImmichBulkMetadataRequest>()
+        resolvedBulkMetadataRequests.forEach { request ->
+            if (request.timeZone == null) {
+                immediateMetadataRequests += request
+            } else {
+                val nonTimezoneRequest = request.copy(timeZone = null)
+                if (nonTimezoneRequest.description != null || nonTimezoneRequest.isFavorite != null || nonTimezoneRequest.dateTimeOriginal != null) {
+                    immediateMetadataRequests += nonTimezoneRequest
+                }
+                deferredTimezoneRequests += ImmichBulkMetadataRequest(ids = request.ids, timeZone = request.timeZone)
+            }
+        }
+
+        immediateMetadataRequests.forEach { request ->
+            val requestsToSend = listOf(request)
+            requestsToSend.forEach { requestItem ->
+                platformLogInfo(
+                    "[immichuploader][exec] updateAssets ids=${requestItem.ids.joinToString(",")} timeZone=${requestItem.timeZone ?: "<null>"} dateTimeOriginal=${requestItem.dateTimeOriginal ?: "<null>"} favorite=${requestItem.isFavorite?.toString() ?: "<null>"} descriptionSet=${requestItem.description != null}"
+                )
+                val bulkRequest = ImmichApiRequest(
+                    method = "PUT",
+                    url = "$IMMICH_API_BASE_URL/assets",
+                    body = ImmichBulkMetadataBody(requestItem.copy(ids = requestItem.ids.sorted()))
+                )
+                val bulkResult = runRequestOrFail(
+                    request = bulkRequest,
+                    requestOrdinal = executedRequestCount + 1,
+                    apiKey = apiKey
+                )
+                executedRequestCount++
+                if (bulkResult.statusCode !in 200..299) {
+                    return ImmichTransportResult.Failed(bulkResult.responseBody)
+                }
+            }
+        }
+
+        resolvedTagAssignRequests.forEach { request ->
+            platformLogInfo(
+                "[immichuploader][exec] tagAssets assetIds=${request.assetIds.joinToString(",")} tagIds=${request.tagIds.joinToString(",")}"
+            )
+            val ids = request.assetIds.sorted()
+            request.tagIds.sorted().forEach { tagId ->
+                val apiRequest = ImmichApiRequest(
+                    method = "PUT",
+                    url = "$IMMICH_API_BASE_URL/tags/$tagId/assets",
+                    body = ImmichTagAssetsBody(ImmichTagAssetsRequest(ids = ids))
+                )
+                val result = runRequestOrFail(
+                    request = apiRequest,
+                    requestOrdinal = executedRequestCount + 1,
+                    apiKey = apiKey
+                )
+                executedRequestCount++
+                if (result.statusCode !in 200..299) {
+                    return ImmichTransportResult.Failed(result.responseBody)
+                }
+                platformLogInfo("[immichuploader][exec] tagAssets response=${result.responseBody}")
+            }
+        }
+
+        resolvedAlbumAddRequests.forEach { request ->
+            val apiRequest = ImmichApiRequest(
+                method = "PUT",
+                url = "$IMMICH_API_BASE_URL/albums/assets",
+                body = ImmichAlbumAddBody(request)
+            )
+            val result = runRequestOrFail(request = apiRequest, requestOrdinal = executedRequestCount + 1, apiKey = apiKey)
+            executedRequestCount++
+            if (result.statusCode !in 200..299) {
+                return ImmichTransportResult.Failed(result.responseBody)
+            }
+        }
+
+        val timezoneOnlyRetryRequests = deferredTimezoneRequests
+            .flatMap { request ->
+                expandMetadataRequestsForCompatibility(request = request)
+            }
+        if (timezoneOnlyRetryRequests.isNotEmpty()) {
+            delay(1500)
+            timezoneOnlyRetryRequests.forEach { request ->
+                platformLogInfo(
+                    "[immichuploader][exec] updateAssets timezone-retry ids=${request.ids.joinToString(",")} timeZone=${request.timeZone ?: "<null>"}"
+                )
+                val apiRequest = ImmichApiRequest(
+                    method = "PUT",
+                    url = "$IMMICH_API_BASE_URL/assets",
+                    body = ImmichBulkMetadataBody(request.copy(ids = request.ids.sorted()))
+                )
+                val result = runRequestOrFail(
+                    request = apiRequest,
+                    requestOrdinal = executedRequestCount + 1,
+                    apiKey = apiKey
+                )
+                executedRequestCount++
+                if (result.statusCode !in 200..299) {
+                    return ImmichTransportResult.Failed(result.responseBody)
+                }
+            }
+        }
+
+        return ImmichTransportResult.Submitted(executedRequestCount)
     }
 
     private suspend fun resolveSessionTagIds(plan: ImmichRequestPlan, apiKey: String): ImmichRequestPlan? {
@@ -114,4 +281,50 @@ class ApiImmichOnlineTransport(
         val root = runCatching { immichJson.parseToJsonElement(responseBody) }.getOrNull() as? JsonObject ?: return null
         return (root["id"] as? JsonPrimitive)?.content?.takeIf { it.isNotBlank() }
     }
+
+    private suspend fun runRequestOrFail(
+        request: ImmichApiRequest,
+        requestOrdinal: Int,
+        apiKey: String
+    ): ImmichApiExecutorResult {
+        val result = runCatching {
+            executor.execute(request = request, apiKey = apiKey)
+        }.getOrElse { throwable ->
+            val message = throwable.message ?: "Unknown transport failure"
+            return ImmichApiExecutorResult(
+                statusCode = 0,
+                responseBody = "Request $requestOrdinal failed before response: $message"
+            )
+        }
+        if (result.statusCode !in 200..299) {
+            return ImmichApiExecutorResult(
+                statusCode = result.statusCode,
+                responseBody = "Request $requestOrdinal failed with HTTP ${result.statusCode} (${request.method} ${request.url})."
+            )
+        }
+        return result
+    }
+
+    private fun extractUploadedAssetId(responseBody: String): String? {
+        val root = runCatching { immichJson.parseToJsonElement(responseBody) }.getOrNull() as? JsonObject ?: return null
+        return root["id"]?.let { (it as? JsonPrimitive)?.contentOrNull?.takeIf(String::isNotBlank) }
+            ?: root["asset"]?.let { asset ->
+                (asset as? JsonObject)?.get("id")?.let { (it as? JsonPrimitive)?.contentOrNull?.takeIf(String::isNotBlank) }
+            }
+    }
+
+    private fun containsPlaceholderMetadataId(requests: List<ImmichBulkMetadataRequest>): Boolean =
+        requests.any { req -> req.ids.any { id -> id.startsWith("remote-") } }
+
+    private fun containsPlaceholderTagAssetId(requests: List<ImmichTagAssignRequest>): Boolean =
+        requests.any { req -> req.assetIds.any { id -> id.startsWith("remote-") } }
+
+    private fun containsPlaceholderAlbumAssetId(requests: List<ImmichAlbumAddRequest>): Boolean =
+        requests.any { req -> req.assetIds.any { id -> id.startsWith("remote-") } }
+
+    private fun expandMetadataRequestsForCompatibility(
+        request: ImmichBulkMetadataRequest
+    ): List<ImmichBulkMetadataRequest> =
+        listOf(request.copy(ids = request.ids.sorted()))
+
 }

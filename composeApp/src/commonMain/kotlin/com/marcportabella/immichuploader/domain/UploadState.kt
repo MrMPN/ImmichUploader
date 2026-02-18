@@ -3,8 +3,8 @@ package com.marcportabella.immichuploader.domain
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
+import kotlin.time.Instant
 
 data class BulkEditDraft(
     val includeDescription: Boolean = false,

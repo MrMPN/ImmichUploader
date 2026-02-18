@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -49,12 +50,13 @@ fun BatchFeedbackBanner(
                 .padding(12.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text(
-                text = "${feedback.level}: ${feedback.message}",
-                color = contentColor,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.weight(1f)
-            )
+            SelectionContainer(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "${feedback.level}: ${feedback.message}",
+                    color = contentColor,
+                    fontWeight = FontWeight.Medium
+                )
+            }
             Button(onClick = onDismiss) {
                 Text("Dismiss")
             }

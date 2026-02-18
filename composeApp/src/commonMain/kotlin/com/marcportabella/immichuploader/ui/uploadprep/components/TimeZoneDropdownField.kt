@@ -28,7 +28,7 @@ fun TimeZoneDropdownField(
     val zoneIds = remember { TimeZone.availableZoneIds.sorted() }
     val normalizedQuery = value.trim()
     val filteredZoneIds = remember(normalizedQuery, zoneIds) {
-        if (normalizedQuery.isBlank()) zoneIds
+        if (normalizedQuery.isBlank()) zoneIds.take(200)
         else zoneIds.filter { it.contains(normalizedQuery, ignoreCase = true) }
     }
     var expanded by remember { mutableStateOf(false) }
@@ -39,10 +39,7 @@ fun TimeZoneDropdownField(
     ) {
         OutlinedTextField(
             value = value,
-            onValueChange = {
-                onValueChange(it)
-                if (enabled) expanded = true
-            },
+            onValueChange = { onValueChange(it) },
             label = { Text(label) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             singleLine = true,

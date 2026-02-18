@@ -27,11 +27,13 @@ fun UploadRequestPlan.toDataRequestPlan(): ImmichRequestPlan =
 private fun UploadUploadRequest.toDataUploadRequest(): ImmichUploadRequest =
     ImmichUploadRequest(
         localAssetId = localAssetId,
+        fileName = metadata["fileName"] ?: localAssetId,
+        mimeType = metadata["mimeType"] ?: "application/octet-stream",
+        sourceFile = null,
         deviceAssetId = deviceAssetId,
         deviceId = deviceId,
         fileCreatedAt = fileCreatedAt,
-        fileModifiedAt = fileModifiedAt,
-        metadata = metadata
+        fileModifiedAt = fileModifiedAt
     )
 
 private fun UploadBulkMetadataRequest.toDataBulkMetadataRequest(): ImmichBulkMetadataRequest =

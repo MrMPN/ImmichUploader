@@ -154,19 +154,24 @@ object UploadRequestPlanner {
         }
 
         plan.bulkMetadataRequests.forEach { request ->
-            requests += UploadApiRequest(
-                method = "PUT",
-                url = "$IMMICH_API_BASE_URL/assets/updateAssets",
-                body = request.toPayloadJson()
-            )
+            val requestsToSend = listOf(request.copy(ids = request.ids.sorted()))
+            requestsToSend.forEach { requestItem ->
+                requests += UploadApiRequest(
+                    method = "PUT",
+                    url = "$IMMICH_API_BASE_URL/assets",
+                    body = requestItem.toPayloadJson()
+                )
+            }
         }
 
         plan.tagAssignRequests.forEach { request ->
-            requests += UploadApiRequest(
-                method = "PUT",
-                url = "$IMMICH_API_BASE_URL/tags/assets",
-                body = request.toPayloadJson()
-            )
+            request.tagIds.sorted().forEach { tagId ->
+                requests += UploadApiRequest(
+                    method = "PUT",
+                    url = "$IMMICH_API_BASE_URL/tags/$tagId/assets",
+                    body = uploadRequestJson.encodeToString(UploadTagAssetsPayload(request.assetIds.sorted()))
+                )
+            }
         }
 
         plan.albumAddRequests.forEach { request ->
@@ -266,7 +271,7 @@ private fun UploadUploadRequest.toPayloadJson(): String {
         deviceId = deviceId,
         fileCreatedAt = fileCreatedAt,
         fileModifiedAt = fileModifiedAt,
-        metadata = metadata
+        metadata = uploadRequestJson.encodeToString(metadata)
     )
     return uploadRequestJson.encodeToString(payload)
 }
@@ -287,8 +292,11 @@ private data class UploadAssetPayload(
     val deviceId: String,
     val fileCreatedAt: String,
     val fileModifiedAt: String,
-    val metadata: Map<String, String>
+    val metadata: String
 )
 
 @Serializable
 private data class UploadNameRequest(val name: String)
+
+@Serializable
+private data class UploadTagAssetsPayload(val ids: List<String>)

@@ -4,6 +4,7 @@ import com.marcportabella.immichuploader.domain.AssetEditPatch
 import com.marcportabella.immichuploader.domain.FieldPatch
 import com.marcportabella.immichuploader.domain.LocalAsset
 import com.marcportabella.immichuploader.domain.UploadPrepState
+import io.github.vinceglb.filekit.PlatformFile
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -22,11 +23,13 @@ internal val immichJson: Json = Json {
 
 data class ImmichUploadRequest(
     val localAssetId: String,
+    val fileName: String,
+    val mimeType: String,
+    val sourceFile: PlatformFile?,
     val deviceAssetId: String,
     val deviceId: String,
     val fileCreatedAt: String,
-    val fileModifiedAt: String,
-    val metadata: Map<String, String>
+    val fileModifiedAt: String
 )
 
 @Serializable
@@ -42,6 +45,11 @@ data class ImmichBulkMetadataRequest(
 data class ImmichTagAssignRequest(
     val assetIds: List<String>,
     val tagIds: List<String>
+)
+
+@Serializable
+data class ImmichTagAssetsRequest(
+    val ids: List<String>
 )
 
 @Serializable
@@ -76,6 +84,8 @@ data class ImmichUploadBody(val payload: ImmichUploadPayload) : ImmichApiBody
 data class ImmichBulkMetadataBody(val payload: ImmichBulkMetadataRequest) : ImmichApiBody
 
 data class ImmichTagAssignBody(val payload: ImmichTagAssignRequest) : ImmichApiBody
+
+data class ImmichTagAssetsBody(val payload: ImmichTagAssetsRequest) : ImmichApiBody
 
 data class ImmichAlbumAddBody(val payload: ImmichAlbumAddRequest) : ImmichApiBody
 
@@ -154,14 +164,13 @@ object ImmichRequestBuilder {
         val timestamp = asset.captureDateTime ?: FALLBACK_TIMESTAMP
         return ImmichUploadRequest(
             localAssetId = asset.id.value,
+            fileName = asset.fileName,
+            mimeType = asset.mimeType,
+            sourceFile = asset.sourceFile,
             deviceAssetId = asset.id.value,
             deviceId = deviceId,
             fileCreatedAt = timestamp,
-            fileModifiedAt = timestamp,
-            metadata = mapOf(
-                "fileName" to asset.fileName,
-                "mimeType" to asset.mimeType
-            )
+            fileModifiedAt = timestamp
         )
     }
 
@@ -283,19 +292,25 @@ object ImmichRequestBuilder {
         }
 
         plan.bulkMetadataRequests.forEach { request ->
-            requests += ImmichApiRequest(
-                method = "PUT",
-                url = "$IMMICH_API_BASE_URL/assets/updateAssets",
-                body = request.toApiBody()
-            )
+            val requestsToSend = listOf(request.copy(ids = request.ids.sorted()))
+            requestsToSend.forEach { requestItem ->
+                requests += ImmichApiRequest(
+                    method = "PUT",
+                    url = "$IMMICH_API_BASE_URL/assets",
+                    body = requestItem.toApiBody()
+                )
+            }
         }
 
         plan.tagAssignRequests.forEach { request ->
-            requests += ImmichApiRequest(
-                method = "PUT",
-                url = "$IMMICH_API_BASE_URL/tags/assets",
-                body = request.toApiBody()
-            )
+            val assetIds = request.assetIds.sorted()
+            request.tagIds.sorted().forEach { tagId ->
+                requests += ImmichApiRequest(
+                    method = "PUT",
+                    url = "$IMMICH_API_BASE_URL/tags/$tagId/assets",
+                    body = ImmichTagAssetsBody(ImmichTagAssetsRequest(ids = assetIds))
+                )
+            }
         }
 
         plan.albumAddRequests.forEach { request ->
@@ -322,12 +337,14 @@ object ImmichRequestBuilder {
 private fun ImmichUploadRequest.toApiBody(): ImmichUploadBody =
     ImmichUploadBody(
         payload = ImmichUploadPayload(
-            assetData = "<binary:$localAssetId>",
+            localAssetId = localAssetId,
+            fileName = fileName,
+            mimeType = mimeType,
+            sourceFile = sourceFile,
             deviceAssetId = deviceAssetId,
             deviceId = deviceId,
             fileCreatedAt = fileCreatedAt,
-            fileModifiedAt = fileModifiedAt,
-            metadata = metadata
+            fileModifiedAt = fileModifiedAt
         )
     )
 
@@ -372,12 +389,13 @@ fun parseExistingAssetsByItemId(
     }.toMap()
 }
 
-@Serializable
 data class ImmichUploadPayload(
-    val assetData: String,
+    val localAssetId: String,
+    val fileName: String,
+    val mimeType: String,
+    val sourceFile: PlatformFile?,
     val deviceAssetId: String,
     val deviceId: String,
     val fileCreatedAt: String,
-    val fileModifiedAt: String,
-    val metadata: Map<String, String>
+    val fileModifiedAt: String
 )

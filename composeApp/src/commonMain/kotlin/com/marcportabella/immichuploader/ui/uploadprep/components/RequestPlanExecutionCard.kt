@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -41,15 +42,19 @@ fun RequestPlanExecutionCard(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Text(
-                "Request plan and execution",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
-            )
-            Text(
-                "Generate a request plan preview before execution to verify payload details and request count.",
-                style = MaterialTheme.typography.bodySmall
-            )
+            SelectionContainer {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        "Request plan and execution",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        "Generate a request plan preview before execution to verify payload details and request count.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
             FlowRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -68,10 +73,14 @@ fun RequestPlanExecutionCard(
             }
 
             HorizontalDivider()
-            if (planMessage != null) Text("Plan message: $planMessage")
-            Text("Execution status: $executionStatus")
-            if (executionMessage != null) Text("Execution message: $executionMessage")
-            if (executionRequestCount != null) Text("Submitted requests: $executionRequestCount")
+            SelectionContainer {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (planMessage != null) Text("Plan message: $planMessage")
+                    Text("Execution status: $executionStatus")
+                    if (executionMessage != null) Text("Execution message: $executionMessage")
+                    if (executionRequestCount != null) Text("Submitted requests: $executionRequestCount")
+                }
+            }
         }
     }
 }

@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -34,41 +35,45 @@ fun DryRunInspectorSection(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text(
-                "Request payload inspector",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
-            )
-            Text("Planned operations: ${requests.size}")
+            SelectionContainer {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "Request payload inspector",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text("Planned operations: ${requests.size}")
 
-            if (plan != null) {
-                Text("Upload ops: ${plan.uploadRequests.size}")
-                Text("Metadata ops: ${plan.bulkMetadataRequests.size}")
-                Text("Tag ops: ${plan.tagAssignRequests.size}")
-                Text("Album ops: ${plan.albumAddRequests.size}")
-                Text("Lookup hooks: ${plan.lookupHooks.size}")
-            }
+                    if (plan != null) {
+                        Text("Upload ops: ${plan.uploadRequests.size}")
+                        Text("Metadata ops: ${plan.bulkMetadataRequests.size}")
+                        Text("Tag ops: ${plan.tagAssignRequests.size}")
+                        Text("Album ops: ${plan.albumAddRequests.size}")
+                        Text("Lookup hooks: ${plan.lookupHooks.size}")
+                    }
 
-            if (message != null) {
-                Text(message)
-            }
+                    if (message != null) {
+                        Text(message)
+                    }
 
-            if (requests.isEmpty()) {
-                Text("No payload preview available yet.")
-            } else {
-                requests.forEachIndexed { index, request ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant
-                        )
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(10.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Text("${index + 1}. ${request.method} ${request.url}")
-                            Text("Payload: ${request.body ?: "<none>"}")
+                    if (requests.isEmpty()) {
+                        Text("No payload preview available yet.")
+                    } else {
+                        requests.forEachIndexed { index, request ->
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                                )
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(10.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text("${index + 1}. ${request.method} ${request.url}")
+                                    Text("Payload: ${request.body ?: "<none>"}")
+                                }
+                            }
                         }
                     }
                 }

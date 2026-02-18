@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -39,28 +40,32 @@ fun SummaryHeaderCard(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                text = "Immich Upload Prep",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.SemiBold
-            )
-            Text(
-                text = "Prepare metadata, validate the request payload, then execute upload safely.",
-                style = MaterialTheme.typography.bodyMedium
-            )
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                SummaryPill("Assets", assetCount.toString())
-                SummaryPill("Selected", selectedCount.toString())
-                SummaryPill("Staged", stagedCount.toString())
-                SummaryPill("Duplicates", duplicateCount.toString())
-                SummaryPill("Dup Check", duplicateStatus)
-                SummaryPill("Transport", gateStatus)
-                SummaryPill("Execution", executionPath)
-                SummaryPill("Catalog", catalogGateStatus)
+            SelectionContainer {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = "Immich Upload Prep",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = "Prepare metadata, validate the request payload, then execute upload safely.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        SummaryPill("Assets", assetCount.toString())
+                        SummaryPill("Selected", selectedCount.toString())
+                        SummaryPill("Staged", stagedCount.toString())
+                        SummaryPill("Duplicates", duplicateCount.toString())
+                        SummaryPill("Dup Check", duplicateStatus)
+                        SummaryPill("Transport", gateStatus)
+                        SummaryPill("Execution", executionPath)
+                        SummaryPill("Catalog", catalogGateStatus)
+                    }
+                }
             }
         }
     }

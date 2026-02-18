@@ -8,8 +8,8 @@ import com.marcportabella.immichuploader.data.ApiKeyGatedImmichCatalogTransport
 import com.marcportabella.immichuploader.data.ApiKeyGatedImmichTransport
 import com.marcportabella.immichuploader.data.ImmichCatalogResult
 import com.marcportabella.immichuploader.data.ImmichBulkUploadCheckResult
+import com.marcportabella.immichuploader.data.ImmichRequestBuilder
 import com.marcportabella.immichuploader.data.ImmichTransportResult
-import com.marcportabella.immichuploader.data.toDataRequestPlan
 import com.marcportabella.immichuploader.data.toDomainCatalogEntry
 import com.marcportabella.immichuploader.domain.AssetEditPatch
 import com.marcportabella.immichuploader.domain.BulkEditDraft
@@ -94,10 +94,11 @@ class UploadPrepStateHolder(
 
     suspend fun executePlan() {
         val snapshot = state
-        val plan = snapshot.dryRunPlan ?: return
+        if (snapshot.dryRunPlan == null) return
+        val executionPlan = ImmichRequestBuilder.buildDryRunPlan(snapshot)
 
         dispatch(UploadPrepAction.UploadExecutionStarted("Executing ${snapshot.dryRunApiRequests.size} API requests."))
-        when (val result = transport.submit(plan = plan.toDataRequestPlan(), apiKey = snapshot.apiKey.ifBlank { null })) {
+        when (val result = transport.submit(plan = executionPlan, apiKey = snapshot.apiKey.ifBlank { null })) {
             is ImmichTransportResult.BlockedMissingApiKey ->
                 dispatch(UploadPrepAction.UploadExecutionBlocked("API key required. Upload execution remained blocked."))
 
