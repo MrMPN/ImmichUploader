@@ -37,11 +37,13 @@ internal fun SingleSelectionEditorCard(
     availableTags: List<UploadCatalogEntry>,
     onPatch: (AssetEditPatch) -> Unit,
     onTagSelectionReplace: (Set<String>, Set<String>) -> Unit,
+    onCreateSessionAlbum: (String) -> Unit,
     onCreateSessionTag: (String) -> Unit,
     onClearStaged: () -> Unit
 ) {
     val metadata = asset.toDisplayMetadata(patch)
     val favorite = metadata.isFavorite ?: false
+    var newAlbumName by rememberSaveable { mutableStateOf("") }
     var newTagName by rememberSaveable { mutableStateOf("") }
 
     Card(
@@ -97,6 +99,31 @@ internal fun SingleSelectionEditorCard(
                     onPatch(AssetEditPatch(albumId = FieldPatch.Set(nextAlbumId)))
                 }
             )
+
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedTextField(
+                    value = newAlbumName,
+                    onValueChange = { newAlbumName = it },
+                    label = { Text("New session album") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Button(
+                    onClick = {
+                        val name = newAlbumName.trim()
+                        if (name.isNotEmpty()) {
+                            onCreateSessionAlbum(name)
+                            newAlbumName = ""
+                        }
+                    },
+                    enabled = newAlbumName.isNotBlank()
+                ) {
+                    Text("Add album")
+                }
+            }
 
             SelectableChipGroup(
                 title = "Select tags for upload",
@@ -162,6 +189,7 @@ private fun SingleSelectionEditorCardPreview() {
             availableTags = previewCatalogTags(),
             onPatch = {},
             onTagSelectionReplace = { _, _ -> },
+            onCreateSessionAlbum = {},
             onCreateSessionTag = {},
             onClearStaged = {}
         )

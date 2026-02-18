@@ -12,8 +12,8 @@ class ApiImmichOnlineTransport(
     private val executor: ImmichApiExecutor = defaultImmichApiExecutor()
 ) : ImmichOnlineTransport {
     override suspend fun submit(plan: ImmichRequestPlan, apiKey: String): ImmichTransportResult {
-        val resolvedPlan = resolveSessionTagIds(plan = plan, apiKey = apiKey) ?: return ImmichTransportResult.Failed(
-            "Failed to resolve one or more session tags before upload."
+        val resolvedPlan = resolveSessionCatalogIds(plan = plan, apiKey = apiKey) ?: return ImmichTransportResult.Failed(
+            "Failed to resolve one or more session tags/albums before upload."
         )
         val missingSource = resolvedPlan.uploadRequests.firstOrNull { it.sourceFile == null }
         if (missingSource != null) {
@@ -142,6 +142,11 @@ class ApiImmichOnlineTransport(
         return ImmichTransportResult.Submitted(executedRequestCount)
     }
 
+    private suspend fun resolveSessionCatalogIds(plan: ImmichRequestPlan, apiKey: String): ImmichRequestPlan? {
+        val tagResolved = resolveSessionTagIds(plan = plan, apiKey = apiKey) ?: return null
+        return resolveSessionAlbumIds(plan = tagResolved, apiKey = apiKey)
+    }
+
     private suspend fun resolveSessionTagIds(plan: ImmichRequestPlan, apiKey: String): ImmichRequestPlan? {
         if (plan.sessionTagsById.isEmpty()) return plan
 
@@ -168,6 +173,30 @@ class ApiImmichOnlineTransport(
         }
 
         return plan.copy(tagAssignRequests = resolvedTagAssign)
+    }
+
+    private suspend fun resolveSessionAlbumIds(plan: ImmichRequestPlan, apiKey: String): ImmichRequestPlan? {
+        if (plan.sessionAlbumsById.isEmpty()) return plan
+
+        val usedSessionAlbumIds = plan.albumAddRequests
+            .asSequence()
+            .map { it.albumId }
+            .filter { it in plan.sessionAlbumsById }
+            .toSet()
+        if (usedSessionAlbumIds.isEmpty()) return plan
+
+        val resolvedIdsBySessionId = mutableMapOf<String, String>()
+        usedSessionAlbumIds.forEach { sessionAlbumId ->
+            val albumName = plan.sessionAlbumsById[sessionAlbumId] ?: return@forEach
+            val resolvedAlbumId = resolveAlbumIdByName(name = albumName, apiKey = apiKey) ?: return null
+            resolvedIdsBySessionId[sessionAlbumId] = resolvedAlbumId
+        }
+
+        val resolvedAlbumAdd = plan.albumAddRequests.map { request ->
+            request.copy(albumId = resolvedIdsBySessionId[request.albumId] ?: request.albumId)
+        }
+
+        return plan.copy(albumAddRequests = resolvedAlbumAdd)
     }
 
     private suspend fun resolveTagIdByName(name: String, apiKey: String): String? {
@@ -220,6 +249,60 @@ class ApiImmichOnlineTransport(
     }
 
     private fun extractTagIdFromPayload(responseBody: String): String? {
+        val root = runCatching { immichJson.parseToJsonElement(responseBody) }.getOrNull() as? JsonObject ?: return null
+        return (root["id"] as? JsonPrimitive)?.content?.takeIf { it.isNotBlank() }
+    }
+
+    private suspend fun resolveAlbumIdByName(name: String, apiKey: String): String? {
+        lookupAlbumIdByName(name = name, apiKey = apiKey)?.let { return it }
+
+        val createResult = runCatching {
+            executor.execute(
+                request = ImmichCatalogRequestBuilder.createAlbum(name),
+                apiKey = apiKey
+            )
+        }.getOrNull() ?: return null
+
+        if (createResult.statusCode !in 200..299) {
+            return lookupAlbumIdByName(name = name, apiKey = apiKey)
+        }
+
+        extractAlbumIdFromPayload(createResult.responseBody)?.let { return it }
+        return lookupAlbumIdByName(name = name, apiKey = apiKey)
+    }
+
+    private suspend fun lookupAlbumIdByName(name: String, apiKey: String): String? {
+        val response = runCatching {
+            executor.execute(
+                request = ImmichCatalogRequestBuilder.lookupAlbums(),
+                apiKey = apiKey
+            )
+        }.getOrNull() ?: return null
+        if (response.statusCode !in 200..299) return null
+        return extractAlbumIdByName(responseBody = response.responseBody, name = name)
+    }
+
+    private fun extractAlbumIdByName(responseBody: String, name: String): String? {
+        val root = runCatching { immichJson.parseToJsonElement(responseBody) }.getOrNull() ?: return null
+        val entries = when (root) {
+            is JsonArray -> root
+            is JsonObject -> root["albums"]?.jsonArray ?: return null
+            else -> return null
+        }
+
+        entries.forEach { element ->
+            val obj = element as? JsonObject ?: return@forEach
+            val albumName = (obj["albumName"] as? JsonPrimitive)?.content
+                ?: (obj["name"] as? JsonPrimitive)?.content
+                ?: return@forEach
+            if (!albumName.equals(name, ignoreCase = true)) return@forEach
+            val id = (obj["id"] as? JsonPrimitive)?.content
+            if (!id.isNullOrBlank()) return id
+        }
+        return null
+    }
+
+    private fun extractAlbumIdFromPayload(responseBody: String): String? {
         val root = runCatching { immichJson.parseToJsonElement(responseBody) }.getOrNull() as? JsonObject ?: return null
         return (root["id"] as? JsonPrimitive)?.content?.takeIf { it.isNotBlank() }
     }

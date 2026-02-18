@@ -140,6 +140,11 @@ class UploadPrepStateHolder(
 
     fun clearSelectedStaged() = dispatch(UploadPrepAction.ClearStagedForSelected)
 
+    fun createSessionAlbumForBulk(name: String) = dispatch(UploadPrepAction.CreateSessionAlbumForBulk(name))
+
+    fun createSessionAlbumForAsset(assetId: LocalAssetId, name: String) =
+        dispatch(UploadPrepAction.CreateSessionAlbumForAsset(assetId, name))
+
     fun createSessionTagForBulk(name: String) = dispatch(UploadPrepAction.CreateSessionTagForBulk(name))
 
     fun createSessionTagForAsset(assetId: LocalAssetId, name: String) =

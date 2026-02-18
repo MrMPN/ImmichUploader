@@ -31,6 +31,7 @@ data class UploadPrepState(
     val tagCreateDraft: String = "",
     val availableAlbums: List<UploadCatalogEntry> = emptyList(),
     val availableTags: List<UploadCatalogEntry> = emptyList(),
+    val sessionAlbumsById: Map<String, String> = emptyMap(),
     val sessionTagsById: Map<String, String> = emptyMap(),
     val duplicateAssetIds: Set<LocalAssetId> = emptySet(),
     val duplicateCheckStatus: DuplicateCheckStatus = DuplicateCheckStatus.Idle,
@@ -99,6 +100,8 @@ sealed interface UploadPrepAction {
     data class SetApiKey(val value: String) : UploadPrepAction
     data class SetAlbumCreateDraft(val value: String) : UploadPrepAction
     data class SetTagCreateDraft(val value: String) : UploadPrepAction
+    data class CreateSessionAlbumForBulk(val name: String) : UploadPrepAction
+    data class CreateSessionAlbumForAsset(val assetId: LocalAssetId, val name: String) : UploadPrepAction
     data class CreateSessionTagForBulk(val name: String) : UploadPrepAction
     data class CreateSessionTagForAsset(val assetId: LocalAssetId, val name: String) : UploadPrepAction
     data object DuplicateCheckStarted : UploadPrepAction
@@ -267,6 +270,39 @@ fun reduceUploadPrepState(state: UploadPrepState, action: UploadPrepAction): Upl
             catalogStatus = CatalogUiStatus.Ready,
             catalogMessage = action.message
         )
+
+        is UploadPrepAction.CreateSessionAlbumForBulk -> {
+            val resolved = resolveOrCreateAlbumEntry(state, action.name) ?: return state
+            state.copy(
+                availableAlbums = resolved.availableAlbums,
+                sessionAlbumsById = resolved.sessionAlbumsById,
+                bulkEditDraft = state.bulkEditDraft.copy(
+                    includeAlbumId = true,
+                    albumId = resolved.id
+                ),
+                batchFeedback = null
+            )
+        }
+
+        is UploadPrepAction.CreateSessionAlbumForAsset -> {
+            val asset = state.assets[action.assetId] ?: return state
+            val resolved = resolveOrCreateAlbumEntry(state, action.name) ?: return state
+            val currentPatch = state.stagedEditsByAssetId[action.assetId]
+            val selectedAlbumId = (currentPatch?.albumId as? FieldPatch.Set<String?>)?.value ?: asset.albumId
+            if (selectedAlbumId == resolved.id &&
+                resolved.availableAlbums == state.availableAlbums &&
+                resolved.sessionAlbumsById == state.sessionAlbumsById
+            ) {
+                return state
+            }
+
+            val patch = AssetEditPatch(albumId = FieldPatch.Set(resolved.id))
+            stagePatchForIds(state, setOf(action.assetId), patch).copy(
+                availableAlbums = resolved.availableAlbums,
+                sessionAlbumsById = resolved.sessionAlbumsById,
+                batchFeedback = null
+            )
+        }
 
         is UploadPrepAction.CreateSessionTagForBulk -> {
             val resolved = resolveOrCreateTagEntry(state, action.name) ?: return state
@@ -601,11 +637,40 @@ class UploadPrepStore(initialState: UploadPrepState = UploadPrepState()) {
     }
 }
 
+private data class ResolvedAlbumEntry(
+    val id: String,
+    val availableAlbums: List<UploadCatalogEntry>,
+    val sessionAlbumsById: Map<String, String>
+)
+
 private data class ResolvedTagEntry(
     val id: String,
     val availableTags: List<UploadCatalogEntry>,
     val sessionTagsById: Map<String, String>
 )
+
+private fun resolveOrCreateAlbumEntry(state: UploadPrepState, rawName: String): ResolvedAlbumEntry? {
+    val normalizedName = rawName.trim()
+    if (normalizedName.isEmpty()) return null
+
+    val existing = state.availableAlbums.firstOrNull { it.name.equals(normalizedName, ignoreCase = true) }
+    if (existing != null) {
+        return ResolvedAlbumEntry(
+            id = existing.id,
+            availableAlbums = state.availableAlbums,
+            sessionAlbumsById = state.sessionAlbumsById
+        )
+    }
+
+    val sessionId = buildSessionAlbumId(normalizedName)
+    val entry = UploadCatalogEntry(id = sessionId, name = normalizedName)
+    val nextSessionAlbums = state.sessionAlbumsById + (sessionId to normalizedName)
+    return ResolvedAlbumEntry(
+        id = sessionId,
+        availableAlbums = (state.availableAlbums + entry).sortedBy { it.name.lowercase() },
+        sessionAlbumsById = nextSessionAlbums
+    )
+}
 
 private fun resolveOrCreateTagEntry(state: UploadPrepState, rawName: String): ResolvedTagEntry? {
     val normalizedName = rawName.trim()
@@ -630,7 +695,11 @@ private fun resolveOrCreateTagEntry(state: UploadPrepState, rawName: String): Re
     )
 }
 
+private const val SESSION_ALBUM_ID_PREFIX = "session-album:"
 private const val SESSION_TAG_ID_PREFIX = "session-tag:"
+
+private fun buildSessionAlbumId(name: String): String =
+    "$SESSION_ALBUM_ID_PREFIX${name.lowercase().trim().hashCode().toUInt().toString(16)}"
 
 private fun buildSessionTagId(name: String): String =
     "$SESSION_TAG_ID_PREFIX${name.lowercase().trim().hashCode().toUInt().toString(16)}"

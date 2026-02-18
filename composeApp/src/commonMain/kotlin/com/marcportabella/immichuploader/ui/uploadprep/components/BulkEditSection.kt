@@ -39,11 +39,13 @@ fun BulkEditSection(
     availableTags: List<UploadCatalogEntry>,
     selectedTagIds: Set<String>,
     onDraftChange: (BulkEditDraft) -> Unit,
+    onCreateSessionAlbum: (String) -> Unit,
     onCreateSessionTag: (String) -> Unit,
     onApply: () -> Unit,
     onClearDraft: () -> Unit,
     onClearSelectedStaged: () -> Unit
 ) {
+    var newAlbumName by rememberSaveable { mutableStateOf("") }
     var newTagName by rememberSaveable { mutableStateOf("") }
 
     Card(
@@ -102,6 +104,26 @@ fun BulkEditSection(
                     )
                 }
             )
+
+            OutlinedTextField(
+                value = newAlbumName,
+                onValueChange = { newAlbumName = it },
+                label = { Text("New session album") },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Button(
+                onClick = {
+                    val name = newAlbumName.trim()
+                    if (name.isNotEmpty()) {
+                        onCreateSessionAlbum(name)
+                        newAlbumName = ""
+                    }
+                },
+                enabled = newAlbumName.isNotBlank()
+            ) {
+                Text("Create and select album")
+            }
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -249,6 +271,7 @@ private fun BulkEditSectionPreview(
             availableTags = previewCatalogTags(),
             selectedTagIds = setOf("tag-1", "tag-3"),
             onDraftChange = {},
+            onCreateSessionAlbum = {},
             onCreateSessionTag = {},
             onApply = {},
             onClearDraft = {},

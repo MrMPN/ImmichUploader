@@ -158,6 +158,7 @@ data class ImmichRequestPlan(
     val tagAssignRequests: List<ImmichTagAssignRequest> = emptyList(),
     val albumAddRequests: List<ImmichAlbumAddRequest> = emptyList(),
     val lookupHooks: List<ImmichLookupHook> = emptyList(),
+    val sessionAlbumsById: Map<String, String> = emptyMap(),
     val sessionTagsById: Map<String, String> = emptyMap()
 )
 
@@ -268,7 +269,7 @@ object ImmichRequestBuilder {
         }
 
         val lookupHooks = buildLookupHooks(
-            albumsToCreate = setOf(state.albumCreateDraft),
+            albumsToCreate = collectSessionAlbumNamesForSelection(state) + setOf(state.albumCreateDraft),
             tagsToCreate = collectSessionTagNamesForSelection(state) + setOf(state.tagCreateDraft)
         )
 
@@ -277,6 +278,7 @@ object ImmichRequestBuilder {
             tagAssignRequests = tagAssignRequests,
             albumAddRequests = albumAddRequests,
             lookupHooks = lookupHooks,
+            sessionAlbumsById = state.sessionAlbumsById,
             sessionTagsById = state.sessionTagsById
         )
     }
@@ -329,6 +331,15 @@ object ImmichRequestBuilder {
             .mapNotNull { state.stagedEditsByAssetId[it] }
             .flatMap { patch -> patch.addTagIds }
             .mapNotNull { sessionTagId -> state.sessionTagsById[sessionTagId] }
+            .toSet()
+    }
+
+    private fun collectSessionAlbumNamesForSelection(state: UploadPrepState): Set<String> {
+        if (state.selectedAssetIds.isEmpty() || state.sessionAlbumsById.isEmpty()) return emptySet()
+        return state.selectedAssetIds
+            .mapNotNull { state.stagedEditsByAssetId[it] }
+            .mapNotNull { patch -> (patch.albumId as? FieldPatch.Set<String?>)?.value }
+            .mapNotNull { sessionAlbumId -> state.sessionAlbumsById[sessionAlbumId] }
             .toSet()
     }
 }

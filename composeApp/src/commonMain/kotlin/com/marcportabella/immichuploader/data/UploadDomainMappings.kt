@@ -21,6 +21,7 @@ fun UploadRequestPlan.toDataRequestPlan(): ImmichRequestPlan =
         tagAssignRequests = tagAssignRequests.map(UploadTagAssignRequest::toDataTagAssignRequest),
         albumAddRequests = albumAddRequests.map(UploadAlbumAddRequest::toDataAlbumAddRequest),
         lookupHooks = lookupHooks.map(UploadLookupHook::toDataLookupHook),
+        sessionAlbumsById = sessionAlbumsById,
         sessionTagsById = sessionTagsById
     )
 
