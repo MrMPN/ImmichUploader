@@ -3,8 +3,12 @@ package com.marcportabella.immichuploader.data
 import com.marcportabella.immichuploader.domain.AssetEditPatch
 import com.marcportabella.immichuploader.domain.FieldPatch
 import com.marcportabella.immichuploader.domain.LocalAsset
+import com.marcportabella.immichuploader.domain.LocalAssetId
 import com.marcportabella.immichuploader.domain.UploadPrepState
 import io.github.vinceglb.filekit.PlatformFile
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toInstant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -26,6 +30,7 @@ data class ImmichUploadRequest(
     val fileName: String,
     val mimeType: String,
     val sourceFile: PlatformFile?,
+    val sidecarData: String? = null,
     val deviceAssetId: String,
     val deviceId: String,
     val fileCreatedAt: String,
@@ -160,13 +165,21 @@ object ImmichRequestBuilder {
     private const val FALLBACK_TIMESTAMP = "1970-01-01T00:00:00Z"
     private const val DEFAULT_DEVICE_ID = "web-local-device"
 
-    fun buildUploadRequest(asset: LocalAsset, deviceId: String): ImmichUploadRequest {
-        val timestamp = asset.captureDateTime ?: FALLBACK_TIMESTAMP
+    fun buildUploadRequest(
+        asset: LocalAsset,
+        deviceId: String,
+        patch: AssetEditPatch? = null
+    ): ImmichUploadRequest {
+        val patchDateTime = (patch?.dateTimeOriginal as? FieldPatch.Set<String>)?.value
+        val patchTimeZone = (patch?.timeZone as? FieldPatch.Set<String>)?.value
+        val timestampBase = patchDateTime ?: asset.captureDateTime ?: FALLBACK_TIMESTAMP
+        val timestamp = withTimezoneOffsetIfMissing(timestampBase, patchTimeZone)
         return ImmichUploadRequest(
             localAssetId = asset.id.value,
             fileName = asset.fileName,
             mimeType = asset.mimeType,
             sourceFile = asset.sourceFile,
+            sidecarData = buildXmpSidecarData(timestamp, patchDateTime != null || patchTimeZone != null),
             deviceAssetId = asset.id.value,
             deviceId = deviceId,
             fileCreatedAt = timestamp,
@@ -233,10 +246,10 @@ object ImmichRequestBuilder {
         deviceId: String = DEFAULT_DEVICE_ID
     ): ImmichRequestPlan {
         val selectedIds = state.selectedAssetIds.toList().sortedBy { it.value }
-        val selectedAssets = selectedIds.mapNotNull { state.assets[it] }
-
-        val uploadRequests = selectedAssets.map { asset ->
-            buildUploadRequest(asset, deviceId)
+        val uploadRequests = selectedIds.mapNotNull { assetId ->
+            val asset = state.assets[assetId] ?: return@mapNotNull null
+            val patch = state.stagedEditsByAssetId[assetId]
+            buildUploadRequest(asset = asset, deviceId = deviceId, patch = patch)
         }
 
         val remoteIdsByPatch = linkedMapOf<AssetEditPatch, MutableSet<String>>()
@@ -246,12 +259,10 @@ object ImmichRequestBuilder {
             remoteIds += "remote-${assetId.value}"
         }
 
-        val bulkMetadataRequests = mutableListOf<ImmichBulkMetadataRequest>()
         val tagAssignRequests = mutableListOf<ImmichTagAssignRequest>()
         val albumAddRequests = mutableListOf<ImmichAlbumAddRequest>()
 
         remoteIdsByPatch.forEach { (patch, remoteIds) ->
-            buildBulkMetadataRequest(remoteIds, patch)?.let { bulkMetadataRequests += it }
             buildTagAssignRequest(remoteIds, patch)?.let { tagAssignRequests += it }
             buildAlbumAddRequest(remoteIds, patch)?.let { albumAddRequests += it }
         }
@@ -263,7 +274,6 @@ object ImmichRequestBuilder {
 
         return ImmichRequestPlan(
             uploadRequests = uploadRequests,
-            bulkMetadataRequests = bulkMetadataRequests,
             tagAssignRequests = tagAssignRequests,
             albumAddRequests = albumAddRequests,
             lookupHooks = lookupHooks,
@@ -289,17 +299,6 @@ object ImmichRequestBuilder {
                 url = "$IMMICH_API_BASE_URL/assets",
                 body = request.toApiBody()
             )
-        }
-
-        plan.bulkMetadataRequests.forEach { request ->
-            val requestsToSend = listOf(request.copy(ids = request.ids.sorted()))
-            requestsToSend.forEach { requestItem ->
-                requests += ImmichApiRequest(
-                    method = "PUT",
-                    url = "$IMMICH_API_BASE_URL/assets",
-                    body = requestItem.toApiBody()
-                )
-            }
         }
 
         plan.tagAssignRequests.forEach { request ->
@@ -341,6 +340,7 @@ private fun ImmichUploadRequest.toApiBody(): ImmichUploadBody =
             fileName = fileName,
             mimeType = mimeType,
             sourceFile = sourceFile,
+            sidecarData = sidecarData,
             deviceAssetId = deviceAssetId,
             deviceId = deviceId,
             fileCreatedAt = fileCreatedAt,
@@ -356,6 +356,29 @@ private fun ImmichTagAssignRequest.toApiBody(): ImmichTagAssignBody =
 
 private fun ImmichAlbumAddRequest.toApiBody(): ImmichAlbumAddBody =
     ImmichAlbumAddBody(payload = copy(assetIds = assetIds.sorted()))
+
+private fun withTimezoneOffsetIfMissing(dateTime: String, timeZone: String?): String {
+    val trimmedDateTime = dateTime.trim()
+    if (trimmedDateTime.endsWith("Z") || OFFSET_SUFFIX_REGEX.containsMatchIn(trimmedDateTime)) return trimmedDateTime
+    val normalizedTimeZone = timeZone?.trim()?.takeIf { it.isNotEmpty() } ?: return trimmedDateTime
+    if (normalizedTimeZone == "Z" || OFFSET_ONLY_REGEX.matches(normalizedTimeZone)) {
+        return "$trimmedDateTime$normalizedTimeZone"
+    }
+    if (!normalizedTimeZone.contains('/')) return trimmedDateTime
+    val localDateTime = runCatching { LocalDateTime.parse(trimmedDateTime.substringBefore('.')) }.getOrNull() ?: return trimmedDateTime
+    val zone = runCatching { TimeZone.of(normalizedTimeZone) }.getOrNull() ?: return trimmedDateTime
+    val instantAtUtc = localDateTime.toInstant(TimeZone.UTC)
+    val instantAtZone = localDateTime.toInstant(zone)
+    val offsetMinutes = ((instantAtUtc.toEpochMilliseconds() - instantAtZone.toEpochMilliseconds()) / 60_000L).toInt()
+    val sign = if (offsetMinutes < 0) "-" else "+"
+    val absolute = kotlin.math.abs(offsetMinutes)
+    val hours = absolute / 60
+    val minutes = absolute % 60
+    return "$trimmedDateTime$sign${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}"
+}
+
+private val OFFSET_SUFFIX_REGEX = Regex("[+-](?:[01]\\d|2[0-3]):[0-5]\\d$")
+private val OFFSET_ONLY_REGEX = Regex("^[+-](?:[01]\\d|2[0-3]):[0-5]\\d$")
 
 fun parseExistingAssetsByItemId(
     responseBody: String,
@@ -394,8 +417,97 @@ data class ImmichUploadPayload(
     val fileName: String,
     val mimeType: String,
     val sourceFile: PlatformFile?,
+    val sidecarData: String? = null,
     val deviceAssetId: String,
     val deviceId: String,
     val fileCreatedAt: String,
     val fileModifiedAt: String
-)
+) {
+    override fun toString(): String =
+        "ImmichUploadPayload(" +
+            "assetData=<binary:$localAssetId>, " +
+            "fileName=$fileName, " +
+            "mimeType=$mimeType, " +
+            "sourceFilePresent=${sourceFile != null}, " +
+            "sidecarDataPresent=${sidecarData != null}, " +
+            "deviceAssetId=$deviceAssetId, " +
+            "deviceId=$deviceId, " +
+            "fileCreatedAt=$fileCreatedAt, " +
+            "fileModifiedAt=$fileModifiedAt" +
+            ")"
+}
+
+private fun buildXmpSidecarData(timestamp: String, enabled: Boolean): String? {
+    if (!enabled) return null
+    val xmpTimestamp = toXmpDateTime(timestamp) ?: return null
+    val xmpSubSecTimestamp = toXmpSubSecDateTime(xmpTimestamp)
+    val exifTimestamp = toExifDateTime(xmpTimestamp) ?: return null
+    val offset = extractOffsetFromXmpDateTime(xmpTimestamp)
+    return """
+        <?xpacket begin='﻿' id='W5M0MpCehiHzreSzNTczkc9d'?>
+        <x:xmpmeta xmlns:x="adobe:ns:meta/">
+          <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+            <rdf:Description rdf:about=""
+              xmlns:xmp="http://ns.adobe.com/xap/1.0/"
+              xmlns:exif="http://ns.adobe.com/exif/1.0/"
+              xmlns:photoshop="http://ns.adobe.com/photoshop/1.0/">
+              <xmp:CreateDate>$xmpTimestamp</xmp:CreateDate>
+              <xmp:SubSecCreateDate>$xmpSubSecTimestamp</xmp:SubSecCreateDate>
+              <xmp:DateTimeCreated>$xmpTimestamp</xmp:DateTimeCreated>
+              <xmp:ModifyDate>$xmpTimestamp</xmp:ModifyDate>
+              <photoshop:DateCreated>$xmpTimestamp</photoshop:DateCreated>
+              <exif:DateTimeOriginal>$exifTimestamp</exif:DateTimeOriginal>
+              ${if (offset != null) "<exif:OffsetTimeOriginal>$offset</exif:OffsetTimeOriginal>" else ""}
+            </rdf:Description>
+          </rdf:RDF>
+        </x:xmpmeta>
+        <?xpacket end='w'?>
+    """.trimIndent()
+}
+
+private fun toXmpDateTime(isoTimestamp: String): String? {
+    val value = isoTimestamp.trim()
+    val match = ISO_TIMESTAMP_REGEX.matchEntire(value) ?: return null
+    val year = match.groupValues[1]
+    val month = match.groupValues[2]
+    val day = match.groupValues[3]
+    val hour = match.groupValues[4]
+    val minute = match.groupValues[5]
+    val second = match.groupValues[6]
+    val zoneRaw = match.groupValues[7]
+    val zone = when {
+        zoneRaw == "Z" -> "+00:00"
+        zoneRaw.isNotBlank() -> zoneRaw
+        else -> return null
+    }
+    return "$year-$month-$day" + "T" + "$hour:$minute:$second$zone"
+}
+
+private fun toXmpSubSecDateTime(xmpTimestamp: String): String {
+    if (xmpTimestamp.contains('.')) return xmpTimestamp
+    val zoneStart = xmpTimestamp.length - 6
+    if (zoneStart <= 0) return xmpTimestamp
+    return xmpTimestamp.substring(0, zoneStart) + ".000" + xmpTimestamp.substring(zoneStart)
+}
+
+private fun toExifDateTime(xmpTimestamp: String): String? {
+    val match = XMP_TIMESTAMP_REGEX.matchEntire(xmpTimestamp) ?: return null
+    val year = match.groupValues[1]
+    val month = match.groupValues[2]
+    val day = match.groupValues[3]
+    val hour = match.groupValues[4]
+    val minute = match.groupValues[5]
+    val second = match.groupValues[6]
+    val offset = match.groupValues[7].replace(":", "")
+    return "$year:$month:$day $hour:$minute:$second$offset"
+}
+
+private val ISO_TIMESTAMP_REGEX =
+    Regex("^(\\d{4})-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2}):(\\d{2})(Z|[+-]\\d{2}:\\d{2})?$")
+private val XMP_TIMESTAMP_REGEX =
+    Regex("^(\\d{4})-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2}):(\\d{2})([+-]\\d{2}:\\d{2})$")
+
+private fun extractOffsetFromXmpDateTime(value: String): String? {
+    val zone = value.takeLast(6)
+    return if (OFFSET_ONLY_REGEX.matches(zone)) zone else null
+}

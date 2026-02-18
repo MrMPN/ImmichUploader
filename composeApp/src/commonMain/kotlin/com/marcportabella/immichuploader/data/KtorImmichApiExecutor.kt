@@ -30,6 +30,9 @@ class KtorImmichApiExecutor(
                         platformLogInfo(
                             "[immichuploader][http] upload-part assetData file=${body.payload.fileName} mime=${body.payload.mimeType} bytes=${fileBytes.size}"
                         )
+                        platformLogInfo(
+                            "[immichuploader][http] upload-payload ${body.payload}"
+                        )
                         setBody(
                             MultiPartFormDataContent(
                                 formData {
@@ -39,11 +42,24 @@ class KtorImmichApiExecutor(
                                         headers = Headers.build {
                                             append(
                                                 HttpHeaders.ContentDisposition,
-                                                """filename="${body.payload.fileName}""""
+                                                "filename=\"${body.payload.fileName}\""
                                             )
                                             append(HttpHeaders.ContentType, body.payload.mimeType)
                                         }
                                     )
+                                    body.payload.sidecarData?.let { sidecar ->
+                                        append(
+                                            key = "sidecarData",
+                                            value = sidecar.encodeToByteArray(),
+                                            headers = Headers.build {
+                                                append(
+                                                    HttpHeaders.ContentDisposition,
+                                                    "filename=\"${body.payload.fileName}.xmp\""
+                                                )
+                                                append(HttpHeaders.ContentType, "application/rdf+xml")
+                                            }
+                                        )
+                                    }
                                     append("deviceAssetId", body.payload.deviceAssetId)
                                     append("deviceId", body.payload.deviceId)
                                     append("fileCreatedAt", body.payload.fileCreatedAt)

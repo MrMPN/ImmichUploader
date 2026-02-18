@@ -27,9 +27,10 @@ fun UploadRequestPlan.toDataRequestPlan(): ImmichRequestPlan =
 private fun UploadUploadRequest.toDataUploadRequest(): ImmichUploadRequest =
     ImmichUploadRequest(
         localAssetId = localAssetId,
-        fileName = metadata["fileName"] ?: localAssetId,
-        mimeType = metadata["mimeType"] ?: "application/octet-stream",
+        fileName = fileName,
+        mimeType = mimeType,
         sourceFile = null,
+        sidecarData = sidecarData,
         deviceAssetId = deviceAssetId,
         deviceId = deviceId,
         fileCreatedAt = fileCreatedAt,

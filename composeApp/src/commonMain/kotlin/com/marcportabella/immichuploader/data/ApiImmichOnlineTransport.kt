@@ -1,7 +1,6 @@
 package com.marcportabella.immichuploader.data
 
 import com.marcportabella.immichuploader.platform.platformLogInfo
-import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -49,6 +48,7 @@ class ApiImmichOnlineTransport(
                         fileName = upload.fileName,
                         mimeType = upload.mimeType,
                         sourceFile = upload.sourceFile,
+                        sidecarData = upload.sidecarData,
                         deviceAssetId = upload.deviceAssetId,
                         deviceId = upload.deviceId,
                         fileCreatedAt = upload.fileCreatedAt,
@@ -96,41 +96,10 @@ class ApiImmichOnlineTransport(
             )
         }
 
-        val immediateMetadataRequests = mutableListOf<ImmichBulkMetadataRequest>()
-        val deferredTimezoneRequests = mutableListOf<ImmichBulkMetadataRequest>()
-        resolvedBulkMetadataRequests.forEach { request ->
-            if (request.timeZone == null) {
-                immediateMetadataRequests += request
-            } else {
-                val nonTimezoneRequest = request.copy(timeZone = null)
-                if (nonTimezoneRequest.description != null || nonTimezoneRequest.isFavorite != null || nonTimezoneRequest.dateTimeOriginal != null) {
-                    immediateMetadataRequests += nonTimezoneRequest
-                }
-                deferredTimezoneRequests += ImmichBulkMetadataRequest(ids = request.ids, timeZone = request.timeZone)
-            }
-        }
-
-        immediateMetadataRequests.forEach { request ->
-            val requestsToSend = listOf(request)
-            requestsToSend.forEach { requestItem ->
-                platformLogInfo(
-                    "[immichuploader][exec] updateAssets ids=${requestItem.ids.joinToString(",")} timeZone=${requestItem.timeZone ?: "<null>"} dateTimeOriginal=${requestItem.dateTimeOriginal ?: "<null>"} favorite=${requestItem.isFavorite?.toString() ?: "<null>"} descriptionSet=${requestItem.description != null}"
-                )
-                val bulkRequest = ImmichApiRequest(
-                    method = "PUT",
-                    url = "$IMMICH_API_BASE_URL/assets",
-                    body = ImmichBulkMetadataBody(requestItem.copy(ids = requestItem.ids.sorted()))
-                )
-                val bulkResult = runRequestOrFail(
-                    request = bulkRequest,
-                    requestOrdinal = executedRequestCount + 1,
-                    apiKey = apiKey
-                )
-                executedRequestCount++
-                if (bulkResult.statusCode !in 200..299) {
-                    return ImmichTransportResult.Failed(bulkResult.responseBody)
-                }
-            }
+        if (resolvedBulkMetadataRequests.isNotEmpty()) {
+            platformLogInfo(
+                "[immichuploader][exec] skipping metadata PUT updates; metadata is applied via upload timestamps"
+            )
         }
 
         resolvedTagAssignRequests.forEach { request ->
@@ -167,33 +136,6 @@ class ApiImmichOnlineTransport(
             executedRequestCount++
             if (result.statusCode !in 200..299) {
                 return ImmichTransportResult.Failed(result.responseBody)
-            }
-        }
-
-        val timezoneOnlyRetryRequests = deferredTimezoneRequests
-            .flatMap { request ->
-                expandMetadataRequestsForCompatibility(request = request)
-            }
-        if (timezoneOnlyRetryRequests.isNotEmpty()) {
-            delay(1500)
-            timezoneOnlyRetryRequests.forEach { request ->
-                platformLogInfo(
-                    "[immichuploader][exec] updateAssets timezone-retry ids=${request.ids.joinToString(",")} timeZone=${request.timeZone ?: "<null>"}"
-                )
-                val apiRequest = ImmichApiRequest(
-                    method = "PUT",
-                    url = "$IMMICH_API_BASE_URL/assets",
-                    body = ImmichBulkMetadataBody(request.copy(ids = request.ids.sorted()))
-                )
-                val result = runRequestOrFail(
-                    request = apiRequest,
-                    requestOrdinal = executedRequestCount + 1,
-                    apiKey = apiKey
-                )
-                executedRequestCount++
-                if (result.statusCode !in 200..299) {
-                    return ImmichTransportResult.Failed(result.responseBody)
-                }
             }
         }
 
@@ -321,10 +263,5 @@ class ApiImmichOnlineTransport(
 
     private fun containsPlaceholderAlbumAssetId(requests: List<ImmichAlbumAddRequest>): Boolean =
         requests.any { req -> req.assetIds.any { id -> id.startsWith("remote-") } }
-
-    private fun expandMetadataRequestsForCompatibility(
-        request: ImmichBulkMetadataRequest
-    ): List<ImmichBulkMetadataRequest> =
-        listOf(request.copy(ids = request.ids.sorted()))
 
 }
