@@ -1,6 +1,7 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackConfig
 import java.util.Properties
 
 val bootstrapConfigOutputDir = layout.buildDirectory.dir("generated/source/bootstrapConfig/webMain/kotlin")
@@ -36,7 +37,12 @@ kotlin {
 
     @OptIn(ExperimentalWasmDsl::class)
     wasmJs {
-        browser()
+        browser {
+            commonWebpackConfig {
+                mode = KotlinWebpackConfig.Mode.PRODUCTION
+                sourceMaps = false
+            }
+        }
         binaries.executable()
     }
 
@@ -117,6 +123,12 @@ tasks.register("compileKotlinWeb") {
 
 tasks.register("webTest") {
     dependsOn(":composeApp:wasmJsTest")
+}
+
+tasks.register("webRelease") {
+    group = "build"
+    description = "Builds optimized/minified WebAssembly browser distribution."
+    dependsOn(":composeApp:wasmJsBrowserDistribution")
 }
 
 val chromeBin = System.getenv("CHROME_BIN")

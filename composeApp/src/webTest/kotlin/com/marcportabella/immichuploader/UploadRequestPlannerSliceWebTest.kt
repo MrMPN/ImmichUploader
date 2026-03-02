@@ -84,16 +84,13 @@ class UploadRequestPlannerSliceWebTest {
     @Test
     fun lookupHooksIncludeLookupsAndCreateHooksDeterministically() {
         val hooks = ImmichRequestBuilder.buildLookupHooks(
-            shouldLookupAlbums = true,
-            shouldLookupTags = true,
             albumsToCreate = setOf("Family", "  "),
             tagsToCreate = setOf("Trip")
         )
 
-        assertTrue(hooks.first() is ImmichLookupHook.LookupAlbums)
-        assertTrue(hooks[1] is ImmichLookupHook.LookupTags)
-        assertTrue(hooks[2] is ImmichLookupHook.CreateAlbumIfMissing)
-        assertTrue(hooks[3] is ImmichLookupHook.CreateTagIfMissing)
+        assertEquals(2, hooks.size)
+        assertTrue(hooks[0] is ImmichLookupHook.CreateAlbumIfMissing)
+        assertTrue(hooks[1] is ImmichLookupHook.CreateTagIfMissing)
     }
 
     @Test
@@ -183,12 +180,18 @@ class UploadRequestPlannerSliceWebTest {
 
         assertTrue(requests.any { it.method == "POST" && it.url == "$IMMICH_API_BASE_URL/assets" })
         assertTrue(requests.any { it.method == "PUT" && it.url == "$IMMICH_API_BASE_URL/assets/updateAssets" })
-        assertTrue(requests.any { it.method == "PUT" && it.url == "$IMMICH_API_BASE_URL/tags/assets" })
+        assertTrue(
+            requests.any {
+                it.method == "PUT" &&
+                    it.url.startsWith("$IMMICH_API_BASE_URL/tags/") &&
+                    it.url.endsWith("/assets")
+            }
+        )
         assertTrue(requests.any { it.method == "PUT" && it.url == "$IMMICH_API_BASE_URL/albums/assets" })
         assertTrue(
             requests.any {
                 val payload = (it.body as? ImmichUploadBody)?.payload
-                payload?.assetData?.startsWith("<binary:") == true
+                payload?.localAssetId == "a"
             }
         )
         assertTrue(
@@ -229,11 +232,13 @@ class UploadRequestPlannerSliceWebTest {
             uploadRequests = listOf(
                 ImmichUploadRequest(
                     localAssetId = "a",
+                    fileName = "line\nbreak",
+                    mimeType = "image/jpeg",
+                    sourceFile = null,
                     deviceAssetId = "dev\"1",
                     deviceId = "device\\1",
                     fileCreatedAt = "2026-02-01T00:00:00Z",
-                    fileModifiedAt = "2026-02-01T00:00:00Z",
-                    metadata = mapOf("fileName" to "line\nbreak", "mimeType" to "image/jpeg")
+                    fileModifiedAt = "2026-02-01T00:00:00Z"
                 )
             ),
             bulkMetadataRequests = listOf(
@@ -266,7 +271,7 @@ class UploadRequestPlannerSliceWebTest {
         assertEquals("Tri\\p", createTagBody.name)
         assertEquals("dev\"1", uploadBody.deviceAssetId)
         assertEquals("device\\1", uploadBody.deviceId)
-        assertEquals("line\nbreak", uploadBody.metadata["fileName"])
+        assertEquals("line\nbreak", uploadBody.fileName)
         assertEquals("quote\"here", metadataBody.description)
     }
 

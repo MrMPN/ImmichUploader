@@ -11,15 +11,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeContentPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
-import com.marcportabella.immichuploader.domain.AssetEditPatch
 import com.marcportabella.immichuploader.domain.BulkEditDraft
 import com.marcportabella.immichuploader.domain.LocalAsset
-import com.marcportabella.immichuploader.domain.LocalAssetId
 import com.marcportabella.immichuploader.domain.UploadPrepState
 import com.marcportabella.immichuploader.domain.canApplyBulkEdit
 
@@ -30,23 +29,14 @@ internal fun UploadPrepScreenContent(
     executionPath: String,
     catalogGateStatus: String,
     sortedAssets: List<LocalAsset>,
-    selectedAssets: List<LocalAsset>,
     bulkPreflightMessage: String?,
     onOpenFilePicker: () -> Unit,
-    onSelectAll: () -> Unit,
-    onClearSelection: () -> Unit,
-    onToggleSelection: (LocalAssetId) -> Unit,
-    onSingleAssetPatch: (LocalAssetId, AssetEditPatch) -> Unit,
-    onSingleAssetTagSelectionReplace: (LocalAssetId, Set<String>, Set<String>) -> Unit,
-    onClearSingleSelectionStaged: () -> Unit,
     onBulkDraftChange: (BulkEditDraft) -> Unit,
     onCreateSessionAlbumForBulk: (String) -> Unit,
     onCreateSessionTagForBulk: (String) -> Unit,
-    onCreateSessionAlbumForAsset: (LocalAssetId, String) -> Unit,
-    onCreateSessionTagForAsset: (LocalAssetId, String) -> Unit,
     onApplyBulk: () -> Unit,
     onClearBulkDraft: () -> Unit,
-    onClearSelectedStaged: () -> Unit,
+    onClearBatchStaged: () -> Unit,
     onClearCatalogMessage: () -> Unit,
     onDismissBatchFeedback: () -> Unit,
     onGeneratePlan: () -> Unit,
@@ -62,6 +52,10 @@ internal fun UploadPrepScreenContent(
             .fillMaxSize()
     ) {
         val isNarrow = maxWidth < 1100.dp
+        val queueColumns = if (isNarrow) 4 else 5
+        val queueRows = remember(sortedAssets, queueColumns) {
+            sortedAssets.chunked(queueColumns.coerceAtLeast(1))
+        }
 
         if (isNarrow) {
             LazyColumn(
@@ -72,7 +66,7 @@ internal fun UploadPrepScreenContent(
                 item {
                     SummaryHeaderCard(
                         assetCount = state.assets.size,
-                        selectedCount = state.selectedAssetIds.size,
+                        batchCount = state.selectedAssetIds.size,
                         stagedCount = state.stagedEditsByAssetId.size,
                         duplicateCount = state.duplicateAssetIds.size,
                         duplicateStatus = state.duplicateCheckStatus.toString(),
@@ -84,43 +78,32 @@ internal fun UploadPrepScreenContent(
                 item {
                     QueueSelectionCard(
                         hasAssets = state.assets.isNotEmpty(),
-                        hasSelection = state.selectedAssetIds.isNotEmpty(),
                         duplicateCheckMessage = state.duplicateCheckMessage,
-                        onOpenFilePicker = onOpenFilePicker,
-                        onSelectAll = onSelectAll,
-                        onClearSelection = onClearSelection
+                        onOpenFilePicker = onOpenFilePicker
                     )
                 }
                 assetQueueSection(
-                    selectedAssetIds = state.selectedAssetIds,
                     duplicateAssetIds = state.duplicateAssetIds,
                     stagedEditsByAssetId = state.stagedEditsByAssetId,
-                    sortedAssets = sortedAssets,
-                    columns = 4,
-                    onToggleSelection = onToggleSelection
+                    rows = queueRows,
+                    columnCount = queueColumns
                 )
                 item {
                     SelectionSidebarPane(
-                        selectedAssets = selectedAssets,
-                        stagedEditsByAssetId = state.stagedEditsByAssetId,
+                        hasAssets = state.assets.isNotEmpty(),
+                        batchAssetCount = state.selectedAssetIds.size,
                         bulkDraft = state.bulkEditDraft,
-                        selectedCount = state.selectedAssetIds.size,
                         applyEnabled = canApplyBulkEdit(state),
                         availableAlbums = state.availableAlbums,
                         availableTags = state.availableTags,
                         catalogMessage = state.catalogMessage,
                         preflightMessage = bulkPreflightMessage,
-                        onSingleAssetPatch = onSingleAssetPatch,
-                        onSingleAssetTagSelectionReplace = onSingleAssetTagSelectionReplace,
-                        onClearSingleSelectionStaged = onClearSingleSelectionStaged,
                         onBulkDraftChange = onBulkDraftChange,
                         onCreateSessionAlbumForBulk = onCreateSessionAlbumForBulk,
                         onCreateSessionTagForBulk = onCreateSessionTagForBulk,
-                        onCreateSessionAlbumForAsset = onCreateSessionAlbumForAsset,
-                        onCreateSessionTagForAsset = onCreateSessionTagForAsset,
                         onApplyBulk = onApplyBulk,
                         onClearBulkDraft = onClearBulkDraft,
-                        onClearSelectedStaged = onClearSelectedStaged,
+                        onClearBatchStaged = onClearBatchStaged,
                         onClearCatalogMessage = onClearCatalogMessage
                     )
                 }
@@ -154,7 +137,7 @@ internal fun UploadPrepScreenContent(
                     item {
                         SummaryHeaderCard(
                             assetCount = state.assets.size,
-                            selectedCount = state.selectedAssetIds.size,
+                            batchCount = state.selectedAssetIds.size,
                             stagedCount = state.stagedEditsByAssetId.size,
                             duplicateCount = state.duplicateAssetIds.size,
                             duplicateStatus = state.duplicateCheckStatus.toString(),
@@ -166,20 +149,15 @@ internal fun UploadPrepScreenContent(
                     item {
                         QueueSelectionCard(
                             hasAssets = state.assets.isNotEmpty(),
-                            hasSelection = state.selectedAssetIds.isNotEmpty(),
                             duplicateCheckMessage = state.duplicateCheckMessage,
-                            onOpenFilePicker = onOpenFilePicker,
-                            onSelectAll = onSelectAll,
-                            onClearSelection = onClearSelection
+                            onOpenFilePicker = onOpenFilePicker
                         )
                     }
                     assetQueueSection(
-                        selectedAssetIds = state.selectedAssetIds,
                         duplicateAssetIds = state.duplicateAssetIds,
                         stagedEditsByAssetId = state.stagedEditsByAssetId,
-                        sortedAssets = sortedAssets,
-                        columns = 5,
-                        onToggleSelection = onToggleSelection
+                        rows = queueRows,
+                        columnCount = queueColumns
                     )
                 }
                 LazyColumn(
@@ -188,26 +166,20 @@ internal fun UploadPrepScreenContent(
                 ) {
                     item {
                         SelectionSidebarPane(
-                            selectedAssets = selectedAssets,
-                            stagedEditsByAssetId = state.stagedEditsByAssetId,
+                            hasAssets = state.assets.isNotEmpty(),
+                            batchAssetCount = state.selectedAssetIds.size,
                             bulkDraft = state.bulkEditDraft,
-                            selectedCount = state.selectedAssetIds.size,
                             applyEnabled = canApplyBulkEdit(state),
                             availableAlbums = state.availableAlbums,
                             availableTags = state.availableTags,
                             catalogMessage = state.catalogMessage,
                             preflightMessage = bulkPreflightMessage,
-                            onSingleAssetPatch = onSingleAssetPatch,
-                            onSingleAssetTagSelectionReplace = onSingleAssetTagSelectionReplace,
-                            onClearSingleSelectionStaged = onClearSingleSelectionStaged,
                             onBulkDraftChange = onBulkDraftChange,
                             onCreateSessionAlbumForBulk = onCreateSessionAlbumForBulk,
                             onCreateSessionTagForBulk = onCreateSessionTagForBulk,
-                            onCreateSessionAlbumForAsset = onCreateSessionAlbumForAsset,
-                            onCreateSessionTagForAsset = onCreateSessionTagForAsset,
                             onApplyBulk = onApplyBulk,
                             onClearBulkDraft = onClearBulkDraft,
-                            onClearSelectedStaged = onClearSelectedStaged,
+                            onClearBatchStaged = onClearBatchStaged,
                             onClearCatalogMessage = onClearCatalogMessage
                         )
                     }
@@ -246,23 +218,14 @@ private fun UploadPrepScreenContentPreview(
             executionPath = PREVIEW_EXECUTION_PATH,
             catalogGateStatus = PREVIEW_CATALOG_STATUS,
             sortedAssets = model.sortedAssets,
-            selectedAssets = model.selectedAssets,
             bulkPreflightMessage = model.bulkPreflightMessage,
             onOpenFilePicker = {},
-            onSelectAll = {},
-            onClearSelection = {},
-            onToggleSelection = {},
-            onSingleAssetPatch = { _, _ -> },
-            onSingleAssetTagSelectionReplace = { _, _, _ -> },
-            onClearSingleSelectionStaged = {},
             onBulkDraftChange = {},
             onCreateSessionAlbumForBulk = {},
             onCreateSessionTagForBulk = {},
-            onCreateSessionAlbumForAsset = { _, _ -> },
-            onCreateSessionTagForAsset = { _, _ -> },
             onApplyBulk = {},
             onClearBulkDraft = {},
-            onClearSelectedStaged = {},
+            onClearBatchStaged = {},
             onClearCatalogMessage = {},
             onDismissBatchFeedback = {},
             onGeneratePlan = {},

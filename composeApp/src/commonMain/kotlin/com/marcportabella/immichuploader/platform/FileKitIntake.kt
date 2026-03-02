@@ -1,24 +1,17 @@
 package com.marcportabella.immichuploader.platform
 
 import com.marcportabella.immichuploader.domain.LocalIntakeFile
-import com.marcportabella.immichuploader.domain.parseJpegExifMetadata
-import com.marcportabella.immichuploader.domain.sha1Hex
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.mimeType
 import io.github.vinceglb.filekit.name
-import io.github.vinceglb.filekit.readBytes
 import io.github.vinceglb.filekit.size
 
 suspend fun PlatformFile.toLocalIntakeFile(): LocalIntakeFile {
+    return toLocalIntakeFileMetadataOnly()
+}
+
+suspend fun PlatformFile.toLocalIntakeFileMetadataOnly(): LocalIntakeFile {
     val mimeType = mimeType()?.toString()?.ifBlank { null } ?: inferMimeTypeFromName(name)
-    val bytes = runCatching { readBytes() }.getOrDefault(ByteArray(0))
-
-    val exifMetadata = if (mimeType.equals("image/jpeg", ignoreCase = true) || mimeType.equals("image/jpg", ignoreCase = true)) {
-        parseJpegExifMetadata(bytes)
-    } else {
-        null
-    }
-
     return LocalIntakeFile(
         name = name,
         type = mimeType,
@@ -26,17 +19,13 @@ suspend fun PlatformFile.toLocalIntakeFile(): LocalIntakeFile {
         lastModifiedEpochMillis = 0L,
         sourceFile = this,
         previewUrl = null,
-        captureDateTime = exifMetadata?.captureDateTime,
-        timeZone = exifMetadata?.timeZone,
-        cameraMake = exifMetadata?.cameraMake,
-        cameraModel = exifMetadata?.cameraModel,
-        checksum = if (bytes.isNotEmpty()) sha1Hex(bytes) else null,
-        exifMetadata = exifMetadata?.metadata ?: emptyMap(),
-        exifSummary = exifMetadata
-            ?.metadata
-            ?.takeIf { it.isNotEmpty() }
-            ?.entries
-            ?.joinToString(" · ") { "${it.key}=${it.value}" }
+        captureDateTime = null,
+        timeZone = null,
+        cameraMake = null,
+        cameraModel = null,
+        checksum = null,
+        exifMetadata = emptyMap(),
+        exifSummary = null
     )
 }
 

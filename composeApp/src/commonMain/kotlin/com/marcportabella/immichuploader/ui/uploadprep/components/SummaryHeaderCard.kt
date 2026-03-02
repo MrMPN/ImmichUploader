@@ -23,7 +23,7 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun SummaryHeaderCard(
     assetCount: Int,
-    selectedCount: Int,
+    batchCount: Int,
     stagedCount: Int,
     duplicateCount: Int,
     duplicateStatus: String,
@@ -57,7 +57,7 @@ fun SummaryHeaderCard(
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         SummaryPill("Assets", assetCount.toString())
-                        SummaryPill("Selected", selectedCount.toString())
+                        SummaryPill("Batch", batchCount.toString())
                         SummaryPill("Staged", stagedCount.toString())
                         SummaryPill("Duplicates", duplicateCount.toString())
                         SummaryPill("Dup Check", duplicateStatus)
@@ -98,7 +98,7 @@ private fun SummaryHeaderCardPreview() {
     MaterialTheme {
         SummaryHeaderCard(
             assetCount = 12,
-            selectedCount = 3,
+            batchCount = 11,
             stagedCount = 2,
             duplicateCount = 1,
             duplicateStatus = "Ready",

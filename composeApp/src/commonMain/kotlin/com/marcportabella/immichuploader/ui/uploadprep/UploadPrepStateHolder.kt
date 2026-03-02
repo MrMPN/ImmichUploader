@@ -11,9 +11,7 @@ import com.marcportabella.immichuploader.data.ImmichBulkUploadCheckResult
 import com.marcportabella.immichuploader.data.ImmichRequestBuilder
 import com.marcportabella.immichuploader.data.ImmichTransportResult
 import com.marcportabella.immichuploader.data.toDomainCatalogEntry
-import com.marcportabella.immichuploader.domain.AssetEditPatch
 import com.marcportabella.immichuploader.domain.BulkEditDraft
-import com.marcportabella.immichuploader.domain.LocalAsset
 import com.marcportabella.immichuploader.domain.LocalAssetId
 import com.marcportabella.immichuploader.domain.LocalIntakeFile
 import com.marcportabella.immichuploader.domain.UploadPrepAction
@@ -23,7 +21,6 @@ import com.marcportabella.immichuploader.domain.canApplyBulkEdit
 import com.marcportabella.immichuploader.domain.mapLocalIntakeFilesToAssets
 import com.marcportabella.immichuploader.domain.preflightBulkEditDraft
 import com.marcportabella.immichuploader.platform.platformLogInfo
-import com.marcportabella.immichuploader.platform.revokePlatformPreviewUrl
 
 class UploadPrepStateHolder(
     private val store: UploadPrepStore,
@@ -44,20 +41,12 @@ class UploadPrepStateHolder(
     val catalogGateStatus: String
         get() = catalogTransport.gateStatus(apiKeyOrNull).toString()
 
-    val sortedAssets: List<LocalAsset>
-        get() = state.assets.values.sortedBy { it.fileName }
-
-    val selectedAssets: List<LocalAsset>
-        get() = state.selectedAssetIds.mapNotNull { state.assets[it] }.sortedBy { it.fileName }
-
     val bulkPreflightMessage: String?
         get() = preflightBulkEditDraft(state)?.message
 
     suspend fun onFilesSelected(nextFiles: List<LocalIntakeFile>) {
-        state.assets.values.mapNotNull { it.previewUrl }.forEach { revokePlatformPreviewUrl(it) }
         val assets = mapLocalIntakeFilesToAssets(nextFiles)
         dispatch(UploadPrepAction.ReplaceAssets(assets))
-        dispatch(UploadPrepAction.ClearSelection)
     }
 
     suspend fun loadCatalogAtInit() {
@@ -115,30 +104,13 @@ class UploadPrepStateHolder(
         }
     }
 
-    fun selectAll() = dispatch(UploadPrepAction.SelectAll)
-
-    fun clearSelection() = dispatch(UploadPrepAction.ClearSelection)
-
-    fun toggleSelection(assetId: LocalAssetId) = dispatch(UploadPrepAction.ToggleSelection(assetId))
-
-    fun patchSingleAsset(assetId: LocalAssetId, patch: AssetEditPatch) =
-        dispatch(UploadPrepAction.StageEditForAsset(assetId, patch))
-
-    fun replaceSingleAssetTagSelection(
-        assetId: LocalAssetId,
-        addTagIds: Set<String>,
-        removeTagIds: Set<String>
-    ) = dispatch(UploadPrepAction.ReplaceTagEditsForAsset(assetId, addTagIds, removeTagIds))
-
-    fun clearSingleSelectionStaged() = dispatch(UploadPrepAction.ClearStagedForSelected)
-
     fun updateBulkDraft(draft: BulkEditDraft) = dispatch(UploadPrepAction.SetBulkEditDraft(draft))
 
     fun applyBulk() = dispatch(UploadPrepAction.ApplyBulkEditDraftToSelected)
 
     fun clearBulkDraft() = dispatch(UploadPrepAction.ClearBulkEditDraft)
 
-    fun clearSelectedStaged() = dispatch(UploadPrepAction.ClearStagedForSelected)
+    fun clearBatchStaged() = dispatch(UploadPrepAction.ClearStagedForSelected)
 
     fun createSessionAlbumForBulk(name: String) = dispatch(UploadPrepAction.CreateSessionAlbumForBulk(name))
 
@@ -157,7 +129,7 @@ class UploadPrepStateHolder(
     fun generatePlan() {
         val before = state
         platformLogInfo(
-            "[immichuploader][plan] generate requested selected=${before.selectedAssetIds.size} staged=${before.stagedEditsByAssetId.size}"
+            "[immichuploader][plan] generate requested batch=${before.selectedAssetIds.size} staged=${before.stagedEditsByAssetId.size}"
         )
         dispatch(UploadPrepAction.GenerateDryRunPreview)
         val after = state

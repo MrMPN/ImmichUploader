@@ -2,6 +2,7 @@ package com.marcportabella.immichuploader.ui.uploadprep
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.tooling.preview.Preview
@@ -19,6 +20,9 @@ fun UploadPrepScreen(
     val stateHolder = rememberUploadPrepStateHolder(store)
     val state = stateHolder.state
     val scope = rememberCoroutineScope()
+    val sortedAssets = remember(state.assets) {
+        state.assets.values.sortedBy { it.fileName }
+    }
 
     if (enableWebEffects) {
         BindPlatformFileInput { nextFiles ->
@@ -45,26 +49,15 @@ fun UploadPrepScreen(
         gateStatus = stateHolder.gateStatus,
         executionPath = stateHolder.executionPath,
         catalogGateStatus = stateHolder.catalogGateStatus,
-        sortedAssets = stateHolder.sortedAssets,
-        selectedAssets = stateHolder.selectedAssets,
+        sortedAssets = sortedAssets,
         bulkPreflightMessage = stateHolder.bulkPreflightMessage,
         onOpenFilePicker = { openPlatformFilePicker() },
-        onSelectAll = { stateHolder.selectAll() },
-        onClearSelection = { stateHolder.clearSelection() },
-        onToggleSelection = { stateHolder.toggleSelection(it) },
-        onSingleAssetPatch = { assetId, patch -> stateHolder.patchSingleAsset(assetId, patch) },
-        onSingleAssetTagSelectionReplace = { assetId, addTagIds, removeTagIds ->
-            stateHolder.replaceSingleAssetTagSelection(assetId, addTagIds, removeTagIds)
-        },
-        onClearSingleSelectionStaged = { stateHolder.clearSingleSelectionStaged() },
         onBulkDraftChange = { draft -> stateHolder.updateBulkDraft(draft) },
         onCreateSessionAlbumForBulk = { name -> stateHolder.createSessionAlbumForBulk(name) },
         onCreateSessionTagForBulk = { name -> stateHolder.createSessionTagForBulk(name) },
-        onCreateSessionAlbumForAsset = { assetId, name -> stateHolder.createSessionAlbumForAsset(assetId, name) },
-        onCreateSessionTagForAsset = { assetId, name -> stateHolder.createSessionTagForAsset(assetId, name) },
         onApplyBulk = { stateHolder.applyBulk() },
         onClearBulkDraft = { stateHolder.clearBulkDraft() },
-        onClearSelectedStaged = { stateHolder.clearSelectedStaged() },
+        onClearBatchStaged = { stateHolder.clearBatchStaged() },
         onClearCatalogMessage = { stateHolder.clearCatalogMessage() },
         onDismissBatchFeedback = { stateHolder.dismissBatchFeedback() },
         onGeneratePlan = { stateHolder.generatePlan() },

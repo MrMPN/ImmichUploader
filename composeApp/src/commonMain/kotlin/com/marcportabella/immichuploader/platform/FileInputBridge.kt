@@ -21,18 +21,18 @@ fun BindPlatformFileInput(
         type = FileKitType.ImageAndVideo
     ) { files ->
         scope.launch {
-            val intakeFiles = files
+            val metadataOnly = files
                 .orEmpty()
                 .mapNotNull { file ->
-                    runCatching { file.toLocalIntakeFile() }
+                    runCatching { file.toLocalIntakeFileMetadataOnly() }
                         .onFailure { throwable ->
                             platformLogError(
-                                "[immichuploader][files] failed to process file: ${throwable.diagnosticMessage()}"
+                                "[immichuploader][files] failed to read metadata: ${throwable.diagnosticMessage()}"
                             )
                         }
                         .getOrNull()
                 }
-            onFilesSelected(intakeFiles)
+            onFilesSelected(metadataOnly)
         }
     }
 

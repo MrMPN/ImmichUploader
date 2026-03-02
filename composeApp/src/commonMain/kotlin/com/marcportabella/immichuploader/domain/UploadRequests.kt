@@ -102,8 +102,10 @@ object UploadRequestPlanner {
 
         val tagAssignRequests = mutableListOf<UploadTagAssignRequest>()
         val albumAddRequests = mutableListOf<UploadAlbumAddRequest>()
+        val bulkMetadataRequests = mutableListOf<UploadBulkMetadataRequest>()
 
         remoteIdsByPatch.forEach { (patch, remoteIds) ->
+            buildBulkMetadataRequest(remoteIds, patch)?.let { bulkMetadataRequests += it }
             buildTagAssignRequest(remoteIds, patch)?.let { tagAssignRequests += it }
             buildAlbumAddRequest(remoteIds, patch)?.let { albumAddRequests += it }
         }
@@ -115,6 +117,7 @@ object UploadRequestPlanner {
 
         return UploadRequestPlan(
             uploadRequests = uploadRequests,
+            bulkMetadataRequests = bulkMetadataRequests,
             tagAssignRequests = tagAssignRequests,
             albumAddRequests = albumAddRequests,
             lookupHooks = lookupHooks,
@@ -154,6 +157,14 @@ object UploadRequestPlanner {
             requests += UploadApiRequest(
                 method = "POST",
                 url = "$IMMICH_API_BASE_URL/assets",
+                body = request.toPayloadJson()
+            )
+        }
+
+        plan.bulkMetadataRequests.forEach { request ->
+            requests += UploadApiRequest(
+                method = "PUT",
+                url = "$IMMICH_API_BASE_URL/assets/updateAssets",
                 body = request.toPayloadJson()
             )
         }

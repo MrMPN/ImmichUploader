@@ -15,14 +15,12 @@ import com.marcportabella.immichuploader.domain.LocalAsset
 import com.marcportabella.immichuploader.domain.LocalAssetId
 
 fun LazyListScope.assetQueueSection(
-    selectedAssetIds: Set<LocalAssetId>,
     duplicateAssetIds: Set<LocalAssetId>,
     stagedEditsByAssetId: Map<LocalAssetId, AssetEditPatch>,
-    sortedAssets: List<LocalAsset>,
-    columns: Int,
-    onToggleSelection: (LocalAssetId) -> Unit
+    rows: List<List<LocalAsset>>,
+    columnCount: Int
 ) {
-    if (sortedAssets.isEmpty()) {
+    if (rows.isEmpty()) {
         item(key = "asset-queue-empty") {
             Text(
                 text = "No files selected yet.",
@@ -33,8 +31,6 @@ fun LazyListScope.assetQueueSection(
         return
     }
 
-    val columnCount = columns.coerceAtLeast(1)
-    val rows = sortedAssets.chunked(columnCount)
     itemsIndexed(
         items = rows,
         key = { index, row -> "asset-row-${index}-${row.first().id.value}" }
@@ -49,9 +45,7 @@ fun LazyListScope.assetQueueSection(
                 AssetQueueTile(
                     asset = asset,
                     metadata = metadata,
-                    isSelected = asset.id in selectedAssetIds,
                     isDuplicate = asset.id in duplicateAssetIds,
-                    onToggleSelection = onToggleSelection,
                     modifier = Modifier.weight(1f)
                 )
             }

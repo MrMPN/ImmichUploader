@@ -22,11 +22,8 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun QueueSelectionCard(
     hasAssets: Boolean,
-    hasSelection: Boolean,
     duplicateCheckMessage: String?,
-    onOpenFilePicker: () -> Unit,
-    onSelectAll: () -> Unit,
-    onClearSelection: () -> Unit
+    onOpenFilePicker: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -40,12 +37,12 @@ fun QueueSelectionCard(
             SelectionContainer {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
-                        "Queue selection",
+                        "Batch intake",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold
                     )
                     Text(
-                        "Load local media, review in the explorer pane, then use the sidebar for edit details.",
+                        "Pick local media to create one upload batch. Metadata edits apply to the full batch.",
                         style = MaterialTheme.typography.bodySmall
                     )
                     duplicateCheckMessage?.let { message ->
@@ -62,9 +59,9 @@ fun QueueSelectionCard(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Button(onClick = onOpenFilePicker) { Text("Select local media") }
-                Button(onClick = onSelectAll, enabled = hasAssets) { Text("Select all") }
-                Button(onClick = onClearSelection, enabled = hasSelection) { Text("Clear selection") }
+                Button(onClick = onOpenFilePicker) {
+                    Text(if (hasAssets) "Replace batch media" else "Select local media")
+                }
             }
         }
     }
@@ -76,11 +73,8 @@ private fun QueueSelectionCardPreview() {
     MaterialTheme {
         QueueSelectionCard(
             hasAssets = true,
-            hasSelection = true,
             duplicateCheckMessage = "Duplicate check completed.",
-            onOpenFilePicker = {},
-            onSelectAll = {},
-            onClearSelection = {}
+            onOpenFilePicker = {}
         )
     }
 }

@@ -262,8 +262,10 @@ object ImmichRequestBuilder {
 
         val tagAssignRequests = mutableListOf<ImmichTagAssignRequest>()
         val albumAddRequests = mutableListOf<ImmichAlbumAddRequest>()
+        val bulkMetadataRequests = mutableListOf<ImmichBulkMetadataRequest>()
 
         remoteIdsByPatch.forEach { (patch, remoteIds) ->
+            buildBulkMetadataRequest(remoteIds, patch)?.let { bulkMetadataRequests += it }
             buildTagAssignRequest(remoteIds, patch)?.let { tagAssignRequests += it }
             buildAlbumAddRequest(remoteIds, patch)?.let { albumAddRequests += it }
         }
@@ -275,6 +277,7 @@ object ImmichRequestBuilder {
 
         return ImmichRequestPlan(
             uploadRequests = uploadRequests,
+            bulkMetadataRequests = bulkMetadataRequests,
             tagAssignRequests = tagAssignRequests,
             albumAddRequests = albumAddRequests,
             lookupHooks = lookupHooks,
@@ -299,6 +302,14 @@ object ImmichRequestBuilder {
             requests += ImmichApiRequest(
                 method = "POST",
                 url = "$IMMICH_API_BASE_URL/assets",
+                body = request.toApiBody()
+            )
+        }
+
+        plan.bulkMetadataRequests.forEach { request ->
+            requests += ImmichApiRequest(
+                method = "PUT",
+                url = "$IMMICH_API_BASE_URL/assets/updateAssets",
                 body = request.toApiBody()
             )
         }

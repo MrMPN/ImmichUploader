@@ -14,7 +14,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
 @Composable
-internal fun BulkEditIntroCard(selectedAssetsCount: Int) {
+internal fun BulkEditIntroCard(batchAssetCount: Int) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -24,7 +24,7 @@ internal fun BulkEditIntroCard(selectedAssetsCount: Int) {
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text("Bulk edit mode", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Text("$selectedAssetsCount assets selected. Changes from this panel apply to the whole selection.")
+            Text("$batchAssetCount assets in batch. Changes from this panel apply to the whole batch.")
         }
     }
 }

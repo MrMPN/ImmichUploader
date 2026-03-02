@@ -32,7 +32,7 @@ import com.marcportabella.immichuploader.domain.UploadCatalogEntry
 @Composable
 fun BulkEditSection(
     draft: BulkEditDraft,
-    selectedCount: Int,
+    batchAssetCount: Int,
     applyEnabled: Boolean,
     preflightMessage: String?,
     availableAlbums: List<UploadCatalogEntry>,
@@ -43,7 +43,7 @@ fun BulkEditSection(
     onCreateSessionTag: (String) -> Unit,
     onApply: () -> Unit,
     onClearDraft: () -> Unit,
-    onClearSelectedStaged: () -> Unit
+    onClearBatchStaged: () -> Unit
 ) {
     var newAlbumName by rememberSaveable { mutableStateOf("") }
     var newTagName by rememberSaveable { mutableStateOf("") }
@@ -65,11 +65,11 @@ fun BulkEditSection(
                 fontWeight = FontWeight.SemiBold
             )
             Text(
-                "Selected subset: $selectedCount",
+                "Batch size: $batchAssetCount",
                 style = MaterialTheme.typography.bodyMedium
             )
             Text(
-                "Toggle each field to include it in the patch before applying to selected assets.",
+                "Toggle each field to include it in the patch before applying to the whole batch.",
                 style = MaterialTheme.typography.bodySmall
             )
 
@@ -241,17 +241,17 @@ fun BulkEditSection(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Button(onClick = onApply, enabled = applyEnabled) {
-                    Text("Apply to selected")
+                    Text("Apply to batch")
                 }
                 Button(onClick = onClearDraft) {
                     Text("Reset bulk draft")
                 }
-                Button(onClick = onClearSelectedStaged, enabled = selectedCount > 0) {
-                    Text("Clear selected staged")
+                Button(onClick = onClearBatchStaged, enabled = batchAssetCount > 0) {
+                    Text("Clear batch staged")
                 }
             }
 
-            Text("Timezone can be bulk-assigned for selected assets.")
+            Text("Timezone can be assigned to all batch assets.")
         }
     }
 }
@@ -264,7 +264,7 @@ private fun BulkEditSectionPreview(
     MaterialTheme {
         BulkEditSection(
             draft = draft,
-            selectedCount = 3,
+            batchAssetCount = 3,
             applyEnabled = true,
             preflightMessage = PREVIEW_PREFLIGHT_MESSAGE,
             availableAlbums = previewCatalogAlbums(),
@@ -275,7 +275,7 @@ private fun BulkEditSectionPreview(
             onCreateSessionTag = {},
             onApply = {},
             onClearDraft = {},
-            onClearSelectedStaged = {}
+            onClearBatchStaged = {}
         )
     }
 }

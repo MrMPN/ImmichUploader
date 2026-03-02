@@ -82,6 +82,15 @@ enum class UploadExecutionStatus {
 
 sealed interface UploadPrepAction {
     data class ReplaceAssets(val assets: List<LocalAsset>) : UploadPrepAction
+    data class ReplaceAssetMetadata(
+        val assetId: LocalAssetId,
+        val captureDateTime: String?,
+        val timeZone: String?,
+        val cameraMake: String?,
+        val cameraModel: String?,
+        val exifMetadata: Map<String, String>,
+        val exifSummary: String?
+    ) : UploadPrepAction
     data class ToggleSelection(val assetId: LocalAssetId) : UploadPrepAction
     data class SetSelection(val assetIds: Set<LocalAssetId>) : UploadPrepAction
     data object SelectAll : UploadPrepAction
@@ -134,7 +143,7 @@ fun reduceUploadPrepState(state: UploadPrepState, action: UploadPrepAction): Upl
             val validIds = nextAssets.keys
             state.copy(
                 assets = nextAssets,
-                selectedAssetIds = state.selectedAssetIds.intersect(validIds),
+                selectedAssetIds = validIds,
                 stagedEditsByAssetId = state.stagedEditsByAssetId.filterKeys { it in validIds },
                 duplicateAssetIds = emptySet(),
                 duplicateCheckStatus = DuplicateCheckStatus.Idle,
@@ -144,6 +153,19 @@ fun reduceUploadPrepState(state: UploadPrepState, action: UploadPrepAction): Upl
                 executionRequestCount = null,
                 batchFeedback = null
             )
+        }
+
+        is UploadPrepAction.ReplaceAssetMetadata -> {
+            val asset = state.assets[action.assetId] ?: return state
+            val nextAsset = asset.copy(
+                captureDateTime = action.captureDateTime,
+                timeZone = action.timeZone,
+                cameraMake = action.cameraMake,
+                cameraModel = action.cameraModel,
+                exifMetadata = action.exifMetadata,
+                exifSummary = action.exifSummary
+            )
+            state.copy(assets = state.assets + (action.assetId to nextAsset))
         }
 
         is UploadPrepAction.ToggleSelection -> {
@@ -197,7 +219,7 @@ fun reduceUploadPrepState(state: UploadPrepState, action: UploadPrepAction): Upl
                 state.copy(
                     batchFeedback = BatchFeedback(
                         level = BatchFeedbackLevel.Warning,
-                        message = "No selected assets to clear."
+                        message = "No editable assets in the batch to clear."
                     )
                 )
             } else {
@@ -205,7 +227,7 @@ fun reduceUploadPrepState(state: UploadPrepState, action: UploadPrepAction): Upl
                     stagedEditsByAssetId = state.stagedEditsByAssetId.filterKeys { it !in state.selectedAssetIds },
                     batchFeedback = BatchFeedback(
                         level = BatchFeedbackLevel.Success,
-                        message = "Cleared staged edits for ${state.selectedAssetIds.size} selected assets."
+                        message = "Cleared staged edits for ${state.selectedAssetIds.size} batch assets."
                     )
                 )
             }
@@ -232,7 +254,7 @@ fun reduceUploadPrepState(state: UploadPrepState, action: UploadPrepAction): Upl
                 stagePatchForIds(state, state.selectedAssetIds, patch).copy(
                     batchFeedback = BatchFeedback(
                         level = BatchFeedbackLevel.Success,
-                        message = "Applied bulk edits to ${state.selectedAssetIds.size} selected assets."
+                        message = "Applied bulk edits to ${state.selectedAssetIds.size} batch assets."
                     )
                 )
             }
@@ -354,7 +376,7 @@ fun reduceUploadPrepState(state: UploadPrepState, action: UploadPrepAction): Upl
                 duplicateAssetIds = duplicateIds,
                 duplicateCheckStatus = DuplicateCheckStatus.Ready,
                 duplicateCheckMessage = action.message,
-                selectedAssetIds = state.selectedAssetIds - duplicateIds,
+                selectedAssetIds = state.assets.keys - duplicateIds,
                 stagedEditsByAssetId = state.stagedEditsByAssetId.filterKeys { it !in duplicateIds }
             )
         }
@@ -403,7 +425,7 @@ fun reduceUploadPrepState(state: UploadPrepState, action: UploadPrepAction): Upl
                 val feedback = if (requests.isEmpty()) {
                     BatchFeedback(
                         level = BatchFeedbackLevel.Warning,
-                        message = "No operations planned. Select assets and/or stage edits first."
+                        message = "No operations planned. Pick a batch and/or stage edits first."
                     )
                 } else {
                     BatchFeedback(
@@ -533,7 +555,7 @@ fun preflightBulkEditDraft(state: UploadPrepState): BatchFeedback? {
     if (state.selectedAssetIds.isEmpty()) {
         return BatchFeedback(
             level = BatchFeedbackLevel.Error,
-            message = "Select at least one asset before applying bulk edits."
+            message = "Pick a batch with at least one non-duplicate asset before applying bulk edits."
         )
     }
 
@@ -596,7 +618,7 @@ private fun preflightDryRun(state: UploadPrepState): BatchFeedback? {
     if (state.selectedAssetIds.isEmpty()) {
         return BatchFeedback(
             level = BatchFeedbackLevel.Error,
-            message = "Select at least one asset before generating a request plan."
+            message = "Pick a batch with at least one non-duplicate asset before generating a request plan."
         )
     }
 
