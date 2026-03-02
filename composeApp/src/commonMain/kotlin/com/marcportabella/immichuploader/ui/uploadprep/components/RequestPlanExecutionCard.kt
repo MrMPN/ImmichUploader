@@ -7,14 +7,18 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -34,46 +38,53 @@ fun RequestPlanExecutionCard(
     onExecute: () -> Unit,
     onClearExecutionStatus: () -> Unit
 ) {
+    var showTechnicalStatus by rememberSaveable { mutableStateOf(false) }
     Card(
         modifier = Modifier.fillMaxWidth().animateContentSize(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            SelectionContainer {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(
-                        "Request plan and execution",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        "Generate a request plan preview before execution to verify payload details and request count.",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
+            Text(
+                "Step 3 · Plan and Upload",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                "Generate the request plan, review it, then execute the upload.",
+                style = MaterialTheme.typography.bodySmall
+            )
+
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(onClick = onGeneratePlan) { Text("Generate plan") }
+                Button(
+                    onClick = onExecute,
+                    enabled = hasPlan && executionStatus != UploadExecutionStatus.Executing
+                ) { Text("Execute upload") }
             }
             FlowRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Button(onClick = onGeneratePlan) { Text("Generate request plan") }
                 Button(onClick = onClearPlan, enabled = hasPlan) { Text("Clear plan") }
-                Button(
-                    onClick = onExecute,
-                    enabled = hasPlan && executionStatus != UploadExecutionStatus.Executing
-                ) { Text("Execute API upload") }
                 Button(
                     onClick = onClearExecutionStatus,
                     enabled = executionMessage != null || executionStatus != UploadExecutionStatus.Idle
-                ) { Text("Clear execution status") }
+                ) { Text("Clear status") }
+            }
+            TextButton(onClick = { showTechnicalStatus = !showTechnicalStatus }) {
+                Text(if (showTechnicalStatus) "Hide technical status" else "Show technical status")
             }
 
-            HorizontalDivider()
-            SelectionContainer {
+            if (showTechnicalStatus) {
+                HorizontalDivider()
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     if (planMessage != null) Text("Plan message: $planMessage")
                     Text("Execution status: $executionStatus")

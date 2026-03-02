@@ -36,7 +36,6 @@ fun SelectionSidebarPane(
 
     val selectedCatalogTagIds = parseCsvIds(bulkDraft.addTagIds)
 
-    BulkEditIntroCard(batchAssetCount = batchAssetCount)
     BulkEditSection(
         draft = bulkDraft,
         batchAssetCount = batchAssetCount,

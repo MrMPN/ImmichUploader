@@ -27,9 +27,9 @@ internal fun SelectionSidebarEmptyStateCard(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text("Details sidebar", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Text("No files selected.")
-            Text("Select one asset to inspect and edit metadata, or select multiple for bulk editing.")
+            Text("Step 2 · Edit Batch Metadata", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text("Pick media first to enable batch editing.")
+            Text("When a batch is loaded, edits from this panel apply to all non-duplicate assets.")
             Text("Albums loaded: $albumsCount | Tags loaded: $tagsCount")
             catalogMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
         }

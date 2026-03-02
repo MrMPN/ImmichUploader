@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
@@ -15,6 +16,7 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,6 +49,7 @@ fun BulkEditSection(
 ) {
     var newAlbumName by rememberSaveable { mutableStateOf("") }
     var newTagName by rememberSaveable { mutableStateOf("") }
+    var showAdvancedFields by rememberSaveable { mutableStateOf(false) }
 
     Card(
         modifier = Modifier
@@ -60,27 +63,20 @@ fun BulkEditSection(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Text(
-                "Bulk edit",
+                "Step 2 · Edit Batch Metadata",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold
             )
+            Text("Batch size: $batchAssetCount assets", style = MaterialTheme.typography.bodyMedium)
             Text(
-                "Batch size: $batchAssetCount",
-                style = MaterialTheme.typography.bodyMedium
-            )
-            Text(
-                "Toggle each field to include it in the patch before applying to the whole batch.",
+                "Turn on a field, set the value, then apply it to all non-duplicate assets in this batch.",
                 style = MaterialTheme.typography.bodySmall
             )
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ToggleFieldRow(
+                enabled = draft.includeDescription,
+                onEnabledChange = { onDraftChange(draft.copy(includeDescription = it)) }
             ) {
-                Checkbox(
-                    checked = draft.includeDescription,
-                    onCheckedChange = { onDraftChange(draft.copy(includeDescription = it)) }
-                )
                 OutlinedTextField(
                     value = draft.description,
                     onValueChange = { onDraftChange(draft.copy(description = it)) },
@@ -89,8 +85,45 @@ fun BulkEditSection(
                 )
             }
 
+            ToggleFieldRow(
+                enabled = draft.includeDateTimeOriginal,
+                onEnabledChange = { onDraftChange(draft.copy(includeDateTimeOriginal = it)) }
+            ) {
+                OutlinedTextField(
+                    value = draft.dateTimeOriginal,
+                    onValueChange = { onDraftChange(draft.copy(dateTimeOriginal = it)) },
+                    label = { Text("Date/time original (ISO 8601)") },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            ToggleFieldRow(
+                enabled = draft.includeTimeZone,
+                onEnabledChange = { onDraftChange(draft.copy(includeTimeZone = it)) }
+            ) {
+                TimeZoneDropdownField(
+                    value = draft.timeZone,
+                    onValueChange = { onDraftChange(draft.copy(timeZone = it)) },
+                    label = "Timezone (IANA, +02:00, or Z)",
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Checkbox(
+                    checked = draft.includeFavorite,
+                    onCheckedChange = { onDraftChange(draft.copy(includeFavorite = it)) }
+                )
+                Button(onClick = { onDraftChange(draft.copy(isFavorite = !draft.isFavorite)) }) {
+                    Text("Favorite = ${draft.isFavorite}")
+                }
+            }
+
             SelectableChipGroup(
-                title = "Choose album",
+                title = "Album",
                 options = availableAlbums.map { ChipOption(id = it.id, label = it.name) },
                 selectedIds = if (draft.includeAlbumId && draft.albumId.isNotBlank()) setOf(draft.albumId) else emptySet(),
                 onToggle = { albumId ->
@@ -111,7 +144,6 @@ fun BulkEditSection(
                 label = { Text("New session album") },
                 modifier = Modifier.fillMaxWidth()
             )
-
             Button(
                 onClick = {
                     val name = newAlbumName.trim()
@@ -125,76 +157,8 @@ fun BulkEditSection(
                 Text("Create and select album")
             }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Checkbox(
-                    checked = draft.includeTimeZone,
-                    onCheckedChange = { onDraftChange(draft.copy(includeTimeZone = it)) }
-                )
-                TimeZoneDropdownField(
-                    value = draft.timeZone,
-                    onValueChange = { onDraftChange(draft.copy(timeZone = it)) },
-                    label = "Timezone (IANA, +02:00, or Z)",
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Checkbox(
-                    checked = draft.includeDateTimeOriginal,
-                    onCheckedChange = { onDraftChange(draft.copy(includeDateTimeOriginal = it)) }
-                )
-                OutlinedTextField(
-                    value = draft.dateTimeOriginal,
-                    onValueChange = { onDraftChange(draft.copy(dateTimeOriginal = it)) },
-                    label = { Text("Date/time original (ISO 8601)") },
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Checkbox(
-                    checked = draft.includeAlbumId,
-                    onCheckedChange = { onDraftChange(draft.copy(includeAlbumId = it)) }
-                )
-                OutlinedTextField(
-                    value = draft.albumId,
-                    onValueChange = { onDraftChange(draft.copy(albumId = it)) },
-                    label = { Text("Album ID") },
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Checkbox(
-                    checked = draft.includeFavorite,
-                    onCheckedChange = { onDraftChange(draft.copy(includeFavorite = it)) }
-                )
-                Button(onClick = { onDraftChange(draft.copy(isFavorite = !draft.isFavorite)) }) {
-                    Text("Favorite = ${draft.isFavorite}")
-                }
-            }
-
-            OutlinedTextField(
-                value = draft.addTagIds,
-                onValueChange = { onDraftChange(draft.copy(addTagIds = it)) },
-                label = { Text("Add tag IDs (comma separated)") },
-                modifier = Modifier.fillMaxWidth()
-            )
-
             SelectableChipGroup(
-                title = "Select tags to add",
+                title = "Tags to add",
                 options = availableTags.map { ChipOption(id = it.id, label = it.name) },
                 selectedIds = selectedTagIds,
                 onToggle = { tagId ->
@@ -210,7 +174,6 @@ fun BulkEditSection(
                 label = { Text("New session tag") },
                 modifier = Modifier.fillMaxWidth()
             )
-
             Button(
                 onClick = {
                     val name = newTagName.trim()
@@ -224,15 +187,44 @@ fun BulkEditSection(
                 Text("Create and select tag")
             }
 
-            OutlinedTextField(
-                value = draft.removeTagIds,
-                onValueChange = { onDraftChange(draft.copy(removeTagIds = it)) },
-                label = { Text("Remove tag IDs (comma separated)") },
-                modifier = Modifier.fillMaxWidth()
-            )
+            TextButton(onClick = { showAdvancedFields = !showAdvancedFields }) {
+                Text(if (showAdvancedFields) "Hide advanced fields" else "Show advanced fields")
+            }
 
-            if (preflightMessage != null) {
-                Text(preflightMessage)
+            if (showAdvancedFields) {
+                ToggleFieldRow(
+                    enabled = draft.includeAlbumId,
+                    onEnabledChange = { onDraftChange(draft.copy(includeAlbumId = it)) }
+                ) {
+                    OutlinedTextField(
+                        value = draft.albumId,
+                        onValueChange = { onDraftChange(draft.copy(albumId = it)) },
+                        label = { Text("Album ID (manual)") },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                OutlinedTextField(
+                    value = draft.addTagIds,
+                    onValueChange = { onDraftChange(draft.copy(addTagIds = it)) },
+                    label = { Text("Add tag IDs (comma separated)") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = draft.removeTagIds,
+                    onValueChange = { onDraftChange(draft.copy(removeTagIds = it)) },
+                    label = { Text("Remove tag IDs (comma separated)") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            preflightMessage?.let { message ->
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
 
             FlowRow(
@@ -241,7 +233,7 @@ fun BulkEditSection(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Button(onClick = onApply, enabled = applyEnabled) {
-                    Text("Apply to batch")
+                    Text("Apply edits to batch")
                 }
                 Button(onClick = onClearDraft) {
                     Text("Reset bulk draft")
@@ -250,9 +242,25 @@ fun BulkEditSection(
                     Text("Clear batch staged")
                 }
             }
-
-            Text("Timezone can be assigned to all batch assets.")
         }
+    }
+}
+
+@Composable
+private fun ToggleFieldRow(
+    enabled: Boolean,
+    onEnabledChange: (Boolean) -> Unit,
+    content: @Composable RowScope.() -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Checkbox(
+            checked = enabled,
+            onCheckedChange = onEnabledChange
+        )
+        content()
     }
 }
 

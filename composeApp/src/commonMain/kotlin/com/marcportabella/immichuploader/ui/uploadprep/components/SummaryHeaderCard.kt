@@ -11,8 +11,13 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.text.font.FontWeight
@@ -31,6 +36,7 @@ fun SummaryHeaderCard(
     executionPath: String,
     catalogGateStatus: String
 ) {
+    var showSystemStatus by rememberSaveable { mutableStateOf(false) }
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
@@ -56,14 +62,26 @@ fun SummaryHeaderCard(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        SummaryPill("Assets", assetCount.toString())
-                        SummaryPill("Batch", batchCount.toString())
+                        SummaryPill("In Batch", batchCount.toString())
+                        SummaryPill("Ready", (batchCount - duplicateCount).coerceAtLeast(0).toString())
                         SummaryPill("Staged", stagedCount.toString())
                         SummaryPill("Duplicates", duplicateCount.toString())
-                        SummaryPill("Dup Check", duplicateStatus)
-                        SummaryPill("Transport", gateStatus)
-                        SummaryPill("Execution", executionPath)
-                        SummaryPill("Catalog", catalogGateStatus)
+                        SummaryPill("Total Picked", assetCount.toString())
+                    }
+                    TextButton(onClick = { showSystemStatus = !showSystemStatus }) {
+                        Text(if (showSystemStatus) "Hide system status" else "Show system status")
+                    }
+                    if (showSystemStatus) {
+                        FlowRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            SummaryPill("Dup Check", duplicateStatus)
+                            SummaryPill("Transport", gateStatus)
+                            SummaryPill("Execution", executionPath)
+                            SummaryPill("Catalog", catalogGateStatus)
+                        }
                     }
                 }
             }
