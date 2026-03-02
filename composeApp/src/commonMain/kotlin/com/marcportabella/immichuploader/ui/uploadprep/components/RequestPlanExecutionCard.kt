@@ -24,6 +24,31 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.marcportabella.immichuploader.domain.UploadExecutionStatus
+import immichuploader.composeapp.generated.resources.Res
+import immichuploader.composeapp.generated.resources.request_button_clear_plan
+import immichuploader.composeapp.generated.resources.request_button_clear_plan_ca
+import immichuploader.composeapp.generated.resources.request_button_clear_status
+import immichuploader.composeapp.generated.resources.request_button_clear_status_ca
+import immichuploader.composeapp.generated.resources.request_button_execute_upload
+import immichuploader.composeapp.generated.resources.request_button_execute_upload_ca
+import immichuploader.composeapp.generated.resources.request_button_generate_plan
+import immichuploader.composeapp.generated.resources.request_button_generate_plan_ca
+import immichuploader.composeapp.generated.resources.request_execution_message
+import immichuploader.composeapp.generated.resources.request_execution_message_ca
+import immichuploader.composeapp.generated.resources.request_execution_status
+import immichuploader.composeapp.generated.resources.request_execution_status_ca
+import immichuploader.composeapp.generated.resources.request_plan_message
+import immichuploader.composeapp.generated.resources.request_plan_message_ca
+import immichuploader.composeapp.generated.resources.request_step_description
+import immichuploader.composeapp.generated.resources.request_step_description_ca
+import immichuploader.composeapp.generated.resources.request_step_title
+import immichuploader.composeapp.generated.resources.request_step_title_ca
+import immichuploader.composeapp.generated.resources.request_submitted_requests
+import immichuploader.composeapp.generated.resources.request_submitted_requests_ca
+import immichuploader.composeapp.generated.resources.request_toggle_hide_technical_status
+import immichuploader.composeapp.generated.resources.request_toggle_hide_technical_status_ca
+import immichuploader.composeapp.generated.resources.request_toggle_show_technical_status
+import immichuploader.composeapp.generated.resources.request_toggle_show_technical_status_ca
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -48,12 +73,18 @@ fun RequestPlanExecutionCard(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
-                "Step 3 · Plan and Upload",
+                i18nString(
+                    english = Res.string.request_step_title,
+                    catalan = Res.string.request_step_title_ca
+                ),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold
             )
             Text(
-                "Generate the request plan, review it, then execute the upload.",
+                i18nString(
+                    english = Res.string.request_step_description,
+                    catalan = Res.string.request_step_description_ca
+                ),
                 style = MaterialTheme.typography.bodySmall
             )
 
@@ -62,34 +93,104 @@ fun RequestPlanExecutionCard(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Button(onClick = onGeneratePlan) { Text("Generate plan") }
+                Button(onClick = onGeneratePlan) {
+                    Text(
+                        i18nString(
+                            english = Res.string.request_button_generate_plan,
+                            catalan = Res.string.request_button_generate_plan_ca
+                        )
+                    )
+                }
                 Button(
                     onClick = onExecute,
                     enabled = hasPlan && executionStatus != UploadExecutionStatus.Executing
-                ) { Text("Execute upload") }
+                ) {
+                    Text(
+                        i18nString(
+                            english = Res.string.request_button_execute_upload,
+                            catalan = Res.string.request_button_execute_upload_ca
+                        )
+                    )
+                }
             }
             FlowRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Button(onClick = onClearPlan, enabled = hasPlan) { Text("Clear plan") }
+                Button(onClick = onClearPlan, enabled = hasPlan) {
+                    Text(
+                        i18nString(
+                            english = Res.string.request_button_clear_plan,
+                            catalan = Res.string.request_button_clear_plan_ca
+                        )
+                    )
+                }
                 Button(
                     onClick = onClearExecutionStatus,
                     enabled = executionMessage != null || executionStatus != UploadExecutionStatus.Idle
-                ) { Text("Clear status") }
+                ) {
+                    Text(
+                        i18nString(
+                            english = Res.string.request_button_clear_status,
+                            catalan = Res.string.request_button_clear_status_ca
+                        )
+                    )
+                }
             }
             TextButton(onClick = { showTechnicalStatus = !showTechnicalStatus }) {
-                Text(if (showTechnicalStatus) "Hide technical status" else "Show technical status")
+                Text(
+                    if (showTechnicalStatus) {
+                        i18nString(
+                            english = Res.string.request_toggle_hide_technical_status,
+                            catalan = Res.string.request_toggle_hide_technical_status_ca
+                        )
+                    } else {
+                        i18nString(
+                            english = Res.string.request_toggle_show_technical_status,
+                            catalan = Res.string.request_toggle_show_technical_status_ca
+                        )
+                    }
+                )
             }
 
             if (showTechnicalStatus) {
                 HorizontalDivider()
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    if (planMessage != null) Text("Plan message: $planMessage")
-                    Text("Execution status: $executionStatus")
-                    if (executionMessage != null) Text("Execution message: $executionMessage")
-                    if (executionRequestCount != null) Text("Submitted requests: $executionRequestCount")
+                    if (planMessage != null) {
+                        Text(
+                            i18nString(
+                                english = Res.string.request_plan_message,
+                                catalan = Res.string.request_plan_message_ca,
+                                planMessage
+                            )
+                        )
+                    }
+                    Text(
+                        i18nString(
+                            english = Res.string.request_execution_status,
+                            catalan = Res.string.request_execution_status_ca,
+                            executionStatus.toString()
+                        )
+                    )
+                    if (executionMessage != null) {
+                        Text(
+                            i18nString(
+                                english = Res.string.request_execution_message,
+                                catalan = Res.string.request_execution_message_ca,
+                                executionMessage
+                            )
+                        )
+                    }
+                    if (executionRequestCount != null) {
+                        Text(
+                            i18nString(
+                                english = Res.string.request_submitted_requests,
+                                catalan = Res.string.request_submitted_requests_ca,
+                                executionRequestCount
+                            )
+                        )
+                    }
                 }
             }
         }

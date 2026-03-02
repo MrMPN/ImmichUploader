@@ -25,6 +25,8 @@ import com.marcportabella.immichuploader.domain.canApplyBulkEdit
 @Composable
 internal fun UploadPrepScreenContent(
     state: UploadPrepState,
+    uiLanguage: UiLanguage,
+    onUiLanguageChange: (UiLanguage) -> Unit,
     gateStatus: String,
     executionPath: String,
     catalogGateStatus: String,
@@ -65,6 +67,8 @@ internal fun UploadPrepScreenContent(
             ) {
                 item {
                     SummaryHeaderCard(
+                        uiLanguage = uiLanguage,
+                        onUiLanguageChange = onUiLanguageChange,
                         assetCount = state.assets.size,
                         batchCount = state.selectedAssetIds.size,
                         stagedCount = state.stagedEditsByAssetId.size,
@@ -136,6 +140,8 @@ internal fun UploadPrepScreenContent(
                 ) {
                     item {
                         SummaryHeaderCard(
+                            uiLanguage = uiLanguage,
+                            onUiLanguageChange = onUiLanguageChange,
                             assetCount = state.assets.size,
                             batchCount = state.selectedAssetIds.size,
                             stagedCount = state.stagedEditsByAssetId.size,
@@ -214,6 +220,8 @@ private fun UploadPrepScreenContentPreview(
     MaterialTheme {
         UploadPrepScreenContent(
             state = model.state,
+            uiLanguage = UiLanguage.Catalan,
+            onUiLanguageChange = {},
             gateStatus = PREVIEW_GATE_STATUS,
             executionPath = PREVIEW_EXECUTION_PATH,
             catalogGateStatus = PREVIEW_CATALOG_STATUS,

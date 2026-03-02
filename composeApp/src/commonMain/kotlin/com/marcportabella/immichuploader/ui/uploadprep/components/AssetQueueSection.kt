@@ -13,6 +13,9 @@ import androidx.compose.ui.unit.dp
 import com.marcportabella.immichuploader.domain.AssetEditPatch
 import com.marcportabella.immichuploader.domain.LocalAsset
 import com.marcportabella.immichuploader.domain.LocalAssetId
+import immichuploader.composeapp.generated.resources.Res
+import immichuploader.composeapp.generated.resources.asset_queue_empty
+import immichuploader.composeapp.generated.resources.asset_queue_empty_ca
 
 fun LazyListScope.assetQueueSection(
     duplicateAssetIds: Set<LocalAssetId>,
@@ -23,7 +26,10 @@ fun LazyListScope.assetQueueSection(
     if (rows.isEmpty()) {
         item(key = "asset-queue-empty") {
             Text(
-                text = "No files selected yet.",
+                text = i18nString(
+                    english = Res.string.asset_queue_empty,
+                    catalan = Res.string.asset_queue_empty_ca
+                ),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

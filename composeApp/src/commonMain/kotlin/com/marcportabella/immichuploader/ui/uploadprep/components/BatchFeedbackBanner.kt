@@ -19,6 +19,15 @@ import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import com.marcportabella.immichuploader.domain.BatchFeedback
 import com.marcportabella.immichuploader.domain.BatchFeedbackLevel
+import immichuploader.composeapp.generated.resources.Res
+import immichuploader.composeapp.generated.resources.batch_feedback_dismiss
+import immichuploader.composeapp.generated.resources.batch_feedback_dismiss_ca
+import immichuploader.composeapp.generated.resources.feedback_level_error
+import immichuploader.composeapp.generated.resources.feedback_level_error_ca
+import immichuploader.composeapp.generated.resources.feedback_level_success
+import immichuploader.composeapp.generated.resources.feedback_level_success_ca
+import immichuploader.composeapp.generated.resources.feedback_level_warning
+import immichuploader.composeapp.generated.resources.feedback_level_warning_ca
 
 @Composable
 fun BatchFeedbackBanner(
@@ -36,6 +45,22 @@ fun BatchFeedbackBanner(
         BatchFeedbackLevel.Warning -> colorScheme.onSecondaryContainer
         BatchFeedbackLevel.Success -> colorScheme.onTertiaryContainer
     }
+    val levelLabel = when (feedback.level) {
+        BatchFeedbackLevel.Error -> i18nString(
+            english = Res.string.feedback_level_error,
+            catalan = Res.string.feedback_level_error_ca
+        )
+
+        BatchFeedbackLevel.Warning -> i18nString(
+            english = Res.string.feedback_level_warning,
+            catalan = Res.string.feedback_level_warning_ca
+        )
+
+        BatchFeedbackLevel.Success -> i18nString(
+            english = Res.string.feedback_level_success,
+            catalan = Res.string.feedback_level_success_ca
+        )
+    }
 
     Card(
         modifier = Modifier
@@ -52,13 +77,18 @@ fun BatchFeedbackBanner(
         ) {
             SelectionContainer(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "${feedback.level}: ${feedback.message}",
+                    text = "$levelLabel: ${feedback.message}",
                     color = contentColor,
                     fontWeight = FontWeight.Medium
                 )
             }
             Button(onClick = onDismiss) {
-                Text("Dismiss")
+                Text(
+                    i18nString(
+                        english = Res.string.batch_feedback_dismiss,
+                        catalan = Res.string.batch_feedback_dismiss_ca
+                    )
+                )
             }
         }
     }

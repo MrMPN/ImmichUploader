@@ -15,6 +15,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun UploadPrepScreen(
     store: UploadPrepStore,
+    uiLanguage: UiLanguage = UiLanguage.Catalan,
+    onUiLanguageChange: (UiLanguage) -> Unit = {},
     enableWebEffects: Boolean = true
 ) {
     val stateHolder = rememberUploadPrepStateHolder(store)
@@ -46,6 +48,8 @@ fun UploadPrepScreen(
 
     UploadPrepScreenContent(
         state = state,
+        uiLanguage = uiLanguage,
+        onUiLanguageChange = onUiLanguageChange,
         gateStatus = stateHolder.gateStatus,
         executionPath = stateHolder.executionPath,
         catalogGateStatus = stateHolder.catalogGateStatus,
@@ -77,6 +81,8 @@ private fun UploadPrepScreenRoutePreview(
     MaterialTheme {
         UploadPrepScreen(
             store = previewStore,
+            uiLanguage = UiLanguage.Catalan,
+            onUiLanguageChange = {},
             enableWebEffects = false
         )
     }

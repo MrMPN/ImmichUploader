@@ -11,8 +11,8 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -23,10 +23,45 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import immichuploader.composeapp.generated.resources.Res
+import immichuploader.composeapp.generated.resources.summary_header_subtitle
+import immichuploader.composeapp.generated.resources.summary_header_subtitle_ca
+import immichuploader.composeapp.generated.resources.summary_header_title
+import immichuploader.composeapp.generated.resources.summary_header_title_ca
+import immichuploader.composeapp.generated.resources.summary_language_catalan
+import immichuploader.composeapp.generated.resources.summary_language_catalan_ca
+import immichuploader.composeapp.generated.resources.summary_language_english
+import immichuploader.composeapp.generated.resources.summary_language_english_ca
+import immichuploader.composeapp.generated.resources.summary_language_label
+import immichuploader.composeapp.generated.resources.summary_language_label_ca
+import immichuploader.composeapp.generated.resources.summary_pill_catalog
+import immichuploader.composeapp.generated.resources.summary_pill_catalog_ca
+import immichuploader.composeapp.generated.resources.summary_pill_dup_check
+import immichuploader.composeapp.generated.resources.summary_pill_dup_check_ca
+import immichuploader.composeapp.generated.resources.summary_pill_duplicates
+import immichuploader.composeapp.generated.resources.summary_pill_duplicates_ca
+import immichuploader.composeapp.generated.resources.summary_pill_execution
+import immichuploader.composeapp.generated.resources.summary_pill_execution_ca
+import immichuploader.composeapp.generated.resources.summary_pill_in_batch
+import immichuploader.composeapp.generated.resources.summary_pill_in_batch_ca
+import immichuploader.composeapp.generated.resources.summary_pill_ready
+import immichuploader.composeapp.generated.resources.summary_pill_ready_ca
+import immichuploader.composeapp.generated.resources.summary_pill_staged
+import immichuploader.composeapp.generated.resources.summary_pill_staged_ca
+import immichuploader.composeapp.generated.resources.summary_pill_total_picked
+import immichuploader.composeapp.generated.resources.summary_pill_total_picked_ca
+import immichuploader.composeapp.generated.resources.summary_pill_transport
+import immichuploader.composeapp.generated.resources.summary_pill_transport_ca
+import immichuploader.composeapp.generated.resources.summary_toggle_hide_system_status
+import immichuploader.composeapp.generated.resources.summary_toggle_hide_system_status_ca
+import immichuploader.composeapp.generated.resources.summary_toggle_show_system_status
+import immichuploader.composeapp.generated.resources.summary_toggle_show_system_status_ca
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SummaryHeaderCard(
+    uiLanguage: UiLanguage,
+    onUiLanguageChange: (UiLanguage) -> Unit,
     assetCount: Int,
     batchCount: Int,
     stagedCount: Int,
@@ -49,12 +84,18 @@ fun SummaryHeaderCard(
             SelectionContainer {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        text = "Immich Upload Prep",
+                        text = i18nString(
+                            english = Res.string.summary_header_title,
+                            catalan = Res.string.summary_header_title_ca
+                        ),
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.SemiBold
                     )
                     Text(
-                        text = "Prepare metadata, validate the request payload, then execute upload safely.",
+                        text = i18nString(
+                            english = Res.string.summary_header_subtitle,
+                            catalan = Res.string.summary_header_subtitle_ca
+                        ),
                         style = MaterialTheme.typography.bodyMedium
                     )
                     FlowRow(
@@ -62,14 +103,92 @@ fun SummaryHeaderCard(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        SummaryPill("In Batch", batchCount.toString())
-                        SummaryPill("Ready", (batchCount - duplicateCount).coerceAtLeast(0).toString())
-                        SummaryPill("Staged", stagedCount.toString())
-                        SummaryPill("Duplicates", duplicateCount.toString())
-                        SummaryPill("Total Picked", assetCount.toString())
+                        Text(
+                            text = i18nString(
+                                english = Res.string.summary_language_label,
+                                catalan = Res.string.summary_language_label_ca
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        TextButton(
+                            onClick = { onUiLanguageChange(UiLanguage.Catalan) },
+                            enabled = uiLanguage != UiLanguage.Catalan
+                        ) {
+                            Text(
+                                i18nString(
+                                    english = Res.string.summary_language_catalan,
+                                    catalan = Res.string.summary_language_catalan_ca
+                                )
+                            )
+                        }
+                        TextButton(
+                            onClick = { onUiLanguageChange(UiLanguage.English) },
+                            enabled = uiLanguage != UiLanguage.English
+                        ) {
+                            Text(
+                                i18nString(
+                                    english = Res.string.summary_language_english,
+                                    catalan = Res.string.summary_language_english_ca
+                                )
+                            )
+                        }
+                    }
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        SummaryPill(
+                            i18nString(
+                                english = Res.string.summary_pill_in_batch,
+                                catalan = Res.string.summary_pill_in_batch_ca
+                            ),
+                            batchCount.toString()
+                        )
+                        SummaryPill(
+                            i18nString(
+                                english = Res.string.summary_pill_ready,
+                                catalan = Res.string.summary_pill_ready_ca
+                            ),
+                            (batchCount - duplicateCount).coerceAtLeast(0).toString()
+                        )
+                        SummaryPill(
+                            i18nString(
+                                english = Res.string.summary_pill_staged,
+                                catalan = Res.string.summary_pill_staged_ca
+                            ),
+                            stagedCount.toString()
+                        )
+                        SummaryPill(
+                            i18nString(
+                                english = Res.string.summary_pill_duplicates,
+                                catalan = Res.string.summary_pill_duplicates_ca
+                            ),
+                            duplicateCount.toString()
+                        )
+                        SummaryPill(
+                            i18nString(
+                                english = Res.string.summary_pill_total_picked,
+                                catalan = Res.string.summary_pill_total_picked_ca
+                            ),
+                            assetCount.toString()
+                        )
                     }
                     TextButton(onClick = { showSystemStatus = !showSystemStatus }) {
-                        Text(if (showSystemStatus) "Hide system status" else "Show system status")
+                        Text(
+                            if (showSystemStatus) {
+                                i18nString(
+                                    english = Res.string.summary_toggle_hide_system_status,
+                                    catalan = Res.string.summary_toggle_hide_system_status_ca
+                                )
+                            } else {
+                                i18nString(
+                                    english = Res.string.summary_toggle_show_system_status,
+                                    catalan = Res.string.summary_toggle_show_system_status_ca
+                                )
+                            }
+                        )
                     }
                     if (showSystemStatus) {
                         FlowRow(
@@ -77,10 +196,34 @@ fun SummaryHeaderCard(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            SummaryPill("Dup Check", duplicateStatus)
-                            SummaryPill("Transport", gateStatus)
-                            SummaryPill("Execution", executionPath)
-                            SummaryPill("Catalog", catalogGateStatus)
+                            SummaryPill(
+                                i18nString(
+                                    english = Res.string.summary_pill_dup_check,
+                                    catalan = Res.string.summary_pill_dup_check_ca
+                                ),
+                                duplicateStatus
+                            )
+                            SummaryPill(
+                                i18nString(
+                                    english = Res.string.summary_pill_transport,
+                                    catalan = Res.string.summary_pill_transport_ca
+                                ),
+                                gateStatus
+                            )
+                            SummaryPill(
+                                i18nString(
+                                    english = Res.string.summary_pill_execution,
+                                    catalan = Res.string.summary_pill_execution_ca
+                                ),
+                                executionPath
+                            )
+                            SummaryPill(
+                                i18nString(
+                                    english = Res.string.summary_pill_catalog,
+                                    catalan = Res.string.summary_pill_catalog_ca
+                                ),
+                                catalogGateStatus
+                            )
                         }
                     }
                 }
@@ -115,6 +258,8 @@ private fun SummaryPill(label: String, value: String) {
 private fun SummaryHeaderCardPreview() {
     MaterialTheme {
         SummaryHeaderCard(
+            uiLanguage = UiLanguage.Catalan,
+            onUiLanguageChange = {},
             assetCount = 12,
             batchCount = 11,
             stagedCount = 2,

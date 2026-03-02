@@ -29,6 +29,51 @@ import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import com.marcportabella.immichuploader.domain.BulkEditDraft
 import com.marcportabella.immichuploader.domain.UploadCatalogEntry
+import immichuploader.composeapp.generated.resources.Res
+import immichuploader.composeapp.generated.resources.bulk_album_title
+import immichuploader.composeapp.generated.resources.bulk_album_title_ca
+import immichuploader.composeapp.generated.resources.bulk_batch_size
+import immichuploader.composeapp.generated.resources.bulk_batch_size_ca
+import immichuploader.composeapp.generated.resources.bulk_button_apply_edits
+import immichuploader.composeapp.generated.resources.bulk_button_apply_edits_ca
+import immichuploader.composeapp.generated.resources.bulk_button_clear_staged
+import immichuploader.composeapp.generated.resources.bulk_button_clear_staged_ca
+import immichuploader.composeapp.generated.resources.bulk_button_create_select_album
+import immichuploader.composeapp.generated.resources.bulk_button_create_select_album_ca
+import immichuploader.composeapp.generated.resources.bulk_button_create_select_tag
+import immichuploader.composeapp.generated.resources.bulk_button_create_select_tag_ca
+import immichuploader.composeapp.generated.resources.bulk_button_reset_draft
+import immichuploader.composeapp.generated.resources.bulk_button_reset_draft_ca
+import immichuploader.composeapp.generated.resources.bulk_description
+import immichuploader.composeapp.generated.resources.bulk_description_ca
+import immichuploader.composeapp.generated.resources.bulk_favorite_button_false
+import immichuploader.composeapp.generated.resources.bulk_favorite_button_false_ca
+import immichuploader.composeapp.generated.resources.bulk_favorite_button_true
+import immichuploader.composeapp.generated.resources.bulk_favorite_button_true_ca
+import immichuploader.composeapp.generated.resources.bulk_label_add_tag_ids
+import immichuploader.composeapp.generated.resources.bulk_label_add_tag_ids_ca
+import immichuploader.composeapp.generated.resources.bulk_label_album_id_manual
+import immichuploader.composeapp.generated.resources.bulk_label_album_id_manual_ca
+import immichuploader.composeapp.generated.resources.bulk_label_datetime_original
+import immichuploader.composeapp.generated.resources.bulk_label_datetime_original_ca
+import immichuploader.composeapp.generated.resources.bulk_label_description
+import immichuploader.composeapp.generated.resources.bulk_label_description_ca
+import immichuploader.composeapp.generated.resources.bulk_label_new_session_album
+import immichuploader.composeapp.generated.resources.bulk_label_new_session_album_ca
+import immichuploader.composeapp.generated.resources.bulk_label_new_session_tag
+import immichuploader.composeapp.generated.resources.bulk_label_new_session_tag_ca
+import immichuploader.composeapp.generated.resources.bulk_label_remove_tag_ids
+import immichuploader.composeapp.generated.resources.bulk_label_remove_tag_ids_ca
+import immichuploader.composeapp.generated.resources.bulk_label_timezone
+import immichuploader.composeapp.generated.resources.bulk_label_timezone_ca
+import immichuploader.composeapp.generated.resources.bulk_step_title
+import immichuploader.composeapp.generated.resources.bulk_step_title_ca
+import immichuploader.composeapp.generated.resources.bulk_tags_to_add_title
+import immichuploader.composeapp.generated.resources.bulk_tags_to_add_title_ca
+import immichuploader.composeapp.generated.resources.bulk_toggle_hide_advanced_fields
+import immichuploader.composeapp.generated.resources.bulk_toggle_hide_advanced_fields_ca
+import immichuploader.composeapp.generated.resources.bulk_toggle_show_advanced_fields
+import immichuploader.composeapp.generated.resources.bulk_toggle_show_advanced_fields_ca
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -63,13 +108,26 @@ fun BulkEditSection(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Text(
-                "Step 2 · Edit Batch Metadata",
+                i18nString(
+                    english = Res.string.bulk_step_title,
+                    catalan = Res.string.bulk_step_title_ca
+                ),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold
             )
-            Text("Batch size: $batchAssetCount assets", style = MaterialTheme.typography.bodyMedium)
             Text(
-                "Turn on a field, set the value, then apply it to all non-duplicate assets in this batch.",
+                i18nString(
+                    english = Res.string.bulk_batch_size,
+                    catalan = Res.string.bulk_batch_size_ca,
+                    batchAssetCount
+                ),
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Text(
+                i18nString(
+                    english = Res.string.bulk_description,
+                    catalan = Res.string.bulk_description_ca
+                ),
                 style = MaterialTheme.typography.bodySmall
             )
 
@@ -80,7 +138,14 @@ fun BulkEditSection(
                 OutlinedTextField(
                     value = draft.description,
                     onValueChange = { onDraftChange(draft.copy(description = it)) },
-                    label = { Text("Description") },
+                    label = {
+                        Text(
+                            i18nString(
+                                english = Res.string.bulk_label_description,
+                                catalan = Res.string.bulk_label_description_ca
+                            )
+                        )
+                    },
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -92,7 +157,14 @@ fun BulkEditSection(
                 OutlinedTextField(
                     value = draft.dateTimeOriginal,
                     onValueChange = { onDraftChange(draft.copy(dateTimeOriginal = it)) },
-                    label = { Text("Date/time original (ISO 8601)") },
+                    label = {
+                        Text(
+                            i18nString(
+                                english = Res.string.bulk_label_datetime_original,
+                                catalan = Res.string.bulk_label_datetime_original_ca
+                            )
+                        )
+                    },
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -104,7 +176,10 @@ fun BulkEditSection(
                 TimeZoneDropdownField(
                     value = draft.timeZone,
                     onValueChange = { onDraftChange(draft.copy(timeZone = it)) },
-                    label = "Timezone (IANA, +02:00, or Z)",
+                    label = i18nString(
+                        english = Res.string.bulk_label_timezone,
+                        catalan = Res.string.bulk_label_timezone_ca
+                    ),
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -118,12 +193,27 @@ fun BulkEditSection(
                     onCheckedChange = { onDraftChange(draft.copy(includeFavorite = it)) }
                 )
                 Button(onClick = { onDraftChange(draft.copy(isFavorite = !draft.isFavorite)) }) {
-                    Text("Favorite = ${draft.isFavorite}")
+                    Text(
+                        if (draft.isFavorite) {
+                            i18nString(
+                                english = Res.string.bulk_favorite_button_true,
+                                catalan = Res.string.bulk_favorite_button_true_ca
+                            )
+                        } else {
+                            i18nString(
+                                english = Res.string.bulk_favorite_button_false,
+                                catalan = Res.string.bulk_favorite_button_false_ca
+                            )
+                        }
+                    )
                 }
             }
 
             SelectableChipGroup(
-                title = "Album",
+                title = i18nString(
+                    english = Res.string.bulk_album_title,
+                    catalan = Res.string.bulk_album_title_ca
+                ),
                 options = availableAlbums.map { ChipOption(id = it.id, label = it.name) },
                 selectedIds = if (draft.includeAlbumId && draft.albumId.isNotBlank()) setOf(draft.albumId) else emptySet(),
                 onToggle = { albumId ->
@@ -141,7 +231,14 @@ fun BulkEditSection(
             OutlinedTextField(
                 value = newAlbumName,
                 onValueChange = { newAlbumName = it },
-                label = { Text("New session album") },
+                label = {
+                    Text(
+                        i18nString(
+                            english = Res.string.bulk_label_new_session_album,
+                            catalan = Res.string.bulk_label_new_session_album_ca
+                        )
+                    )
+                },
                 modifier = Modifier.fillMaxWidth()
             )
             Button(
@@ -154,11 +251,19 @@ fun BulkEditSection(
                 },
                 enabled = newAlbumName.isNotBlank()
             ) {
-                Text("Create and select album")
+                Text(
+                    i18nString(
+                        english = Res.string.bulk_button_create_select_album,
+                        catalan = Res.string.bulk_button_create_select_album_ca
+                    )
+                )
             }
 
             SelectableChipGroup(
-                title = "Tags to add",
+                title = i18nString(
+                    english = Res.string.bulk_tags_to_add_title,
+                    catalan = Res.string.bulk_tags_to_add_title_ca
+                ),
                 options = availableTags.map { ChipOption(id = it.id, label = it.name) },
                 selectedIds = selectedTagIds,
                 onToggle = { tagId ->
@@ -171,7 +276,14 @@ fun BulkEditSection(
             OutlinedTextField(
                 value = newTagName,
                 onValueChange = { newTagName = it },
-                label = { Text("New session tag") },
+                label = {
+                    Text(
+                        i18nString(
+                            english = Res.string.bulk_label_new_session_tag,
+                            catalan = Res.string.bulk_label_new_session_tag_ca
+                        )
+                    )
+                },
                 modifier = Modifier.fillMaxWidth()
             )
             Button(
@@ -184,11 +296,28 @@ fun BulkEditSection(
                 },
                 enabled = newTagName.isNotBlank()
             ) {
-                Text("Create and select tag")
+                Text(
+                    i18nString(
+                        english = Res.string.bulk_button_create_select_tag,
+                        catalan = Res.string.bulk_button_create_select_tag_ca
+                    )
+                )
             }
 
             TextButton(onClick = { showAdvancedFields = !showAdvancedFields }) {
-                Text(if (showAdvancedFields) "Hide advanced fields" else "Show advanced fields")
+                Text(
+                    if (showAdvancedFields) {
+                        i18nString(
+                            english = Res.string.bulk_toggle_hide_advanced_fields,
+                            catalan = Res.string.bulk_toggle_hide_advanced_fields_ca
+                        )
+                    } else {
+                        i18nString(
+                            english = Res.string.bulk_toggle_show_advanced_fields,
+                            catalan = Res.string.bulk_toggle_show_advanced_fields_ca
+                        )
+                    }
+                )
             }
 
             if (showAdvancedFields) {
@@ -199,7 +328,14 @@ fun BulkEditSection(
                     OutlinedTextField(
                         value = draft.albumId,
                         onValueChange = { onDraftChange(draft.copy(albumId = it)) },
-                        label = { Text("Album ID (manual)") },
+                        label = {
+                            Text(
+                                i18nString(
+                                    english = Res.string.bulk_label_album_id_manual,
+                                    catalan = Res.string.bulk_label_album_id_manual_ca
+                                )
+                            )
+                        },
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -207,14 +343,28 @@ fun BulkEditSection(
                 OutlinedTextField(
                     value = draft.addTagIds,
                     onValueChange = { onDraftChange(draft.copy(addTagIds = it)) },
-                    label = { Text("Add tag IDs (comma separated)") },
+                    label = {
+                        Text(
+                            i18nString(
+                                english = Res.string.bulk_label_add_tag_ids,
+                                catalan = Res.string.bulk_label_add_tag_ids_ca
+                            )
+                        )
+                    },
                     modifier = Modifier.fillMaxWidth()
                 )
 
                 OutlinedTextField(
                     value = draft.removeTagIds,
                     onValueChange = { onDraftChange(draft.copy(removeTagIds = it)) },
-                    label = { Text("Remove tag IDs (comma separated)") },
+                    label = {
+                        Text(
+                            i18nString(
+                                english = Res.string.bulk_label_remove_tag_ids,
+                                catalan = Res.string.bulk_label_remove_tag_ids_ca
+                            )
+                        )
+                    },
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -233,13 +383,28 @@ fun BulkEditSection(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Button(onClick = onApply, enabled = applyEnabled) {
-                    Text("Apply edits to batch")
+                    Text(
+                        i18nString(
+                            english = Res.string.bulk_button_apply_edits,
+                            catalan = Res.string.bulk_button_apply_edits_ca
+                        )
+                    )
                 }
                 Button(onClick = onClearDraft) {
-                    Text("Reset bulk draft")
+                    Text(
+                        i18nString(
+                            english = Res.string.bulk_button_reset_draft,
+                            catalan = Res.string.bulk_button_reset_draft_ca
+                        )
+                    )
                 }
                 Button(onClick = onClearBatchStaged, enabled = batchAssetCount > 0) {
-                    Text("Clear batch staged")
+                    Text(
+                        i18nString(
+                            english = Res.string.bulk_button_clear_staged,
+                            catalan = Res.string.bulk_button_clear_staged_ca
+                        )
+                    )
                 }
             }
         }

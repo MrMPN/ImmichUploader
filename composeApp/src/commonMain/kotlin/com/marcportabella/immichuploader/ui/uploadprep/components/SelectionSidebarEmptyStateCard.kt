@@ -12,6 +12,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import immichuploader.composeapp.generated.resources.Res
+import immichuploader.composeapp.generated.resources.sidebar_empty_catalog_counts
+import immichuploader.composeapp.generated.resources.sidebar_empty_catalog_counts_ca
+import immichuploader.composeapp.generated.resources.sidebar_empty_description
+import immichuploader.composeapp.generated.resources.sidebar_empty_description_ca
+import immichuploader.composeapp.generated.resources.sidebar_empty_pick_media_first
+import immichuploader.composeapp.generated.resources.sidebar_empty_pick_media_first_ca
+import immichuploader.composeapp.generated.resources.sidebar_empty_title
+import immichuploader.composeapp.generated.resources.sidebar_empty_title_ca
 
 @Composable
 internal fun SelectionSidebarEmptyStateCard(
@@ -27,10 +36,34 @@ internal fun SelectionSidebarEmptyStateCard(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text("Step 2 · Edit Batch Metadata", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Text("Pick media first to enable batch editing.")
-            Text("When a batch is loaded, edits from this panel apply to all non-duplicate assets.")
-            Text("Albums loaded: $albumsCount | Tags loaded: $tagsCount")
+            Text(
+                i18nString(
+                    english = Res.string.sidebar_empty_title,
+                    catalan = Res.string.sidebar_empty_title_ca
+                ),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                i18nString(
+                    english = Res.string.sidebar_empty_pick_media_first,
+                    catalan = Res.string.sidebar_empty_pick_media_first_ca
+                )
+            )
+            Text(
+                i18nString(
+                    english = Res.string.sidebar_empty_description,
+                    catalan = Res.string.sidebar_empty_description_ca
+                )
+            )
+            Text(
+                i18nString(
+                    english = Res.string.sidebar_empty_catalog_counts,
+                    catalan = Res.string.sidebar_empty_catalog_counts_ca,
+                    albumsCount,
+                    tagsCount
+                )
+            )
             catalogMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
         }
     }

@@ -4,7 +4,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -12,6 +17,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.marcportabella.immichuploader.domain.UploadPrepState
 import com.marcportabella.immichuploader.domain.UploadPrepStore
+import com.marcportabella.immichuploader.ui.uploadprep.LocalUiLanguage
+import com.marcportabella.immichuploader.ui.uploadprep.UiLanguage
 import com.marcportabella.immichuploader.ui.uploadprep.UploadPrepScreen
 
 @Composable
@@ -81,6 +88,13 @@ fun App() {
                 UploadPrepState(apiKey = BOOTSTRAP_IMMICH_API_KEY)
             )
         }
-        UploadPrepScreen(store)
+        var uiLanguage by rememberSaveable { mutableStateOf(UiLanguage.Catalan) }
+        CompositionLocalProvider(LocalUiLanguage provides uiLanguage) {
+            UploadPrepScreen(
+                store = store,
+                uiLanguage = uiLanguage,
+                onUiLanguageChange = { uiLanguage = it }
+            )
+        }
     }
 }

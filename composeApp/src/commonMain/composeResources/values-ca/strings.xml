@@ -1,0 +1,88 @@
+<resources>
+    <string name="summary_header_title">Preparació de pujada a Immich</string>
+    <string name="summary_header_subtitle">Prepara les metadades, valida el payload de les peticions i després executa la pujada amb seguretat.</string>
+    <string name="summary_pill_in_batch">Al lot</string>
+    <string name="summary_pill_ready">A punt</string>
+    <string name="summary_pill_staged">Preparades</string>
+    <string name="summary_pill_duplicates">Duplicats</string>
+    <string name="summary_pill_total_picked">Total triats</string>
+    <string name="summary_pill_dup_check">Comprov. dup.</string>
+    <string name="summary_pill_transport">Transport</string>
+    <string name="summary_pill_execution">Execució</string>
+    <string name="summary_pill_catalog">Catàleg</string>
+    <string name="summary_toggle_show_system_status">Mostra l'estat del sistema</string>
+    <string name="summary_toggle_hide_system_status">Amaga l'estat del sistema</string>
+
+    <string name="queue_step_title">Pas 1 · Tria el contingut del lot</string>
+    <string name="queue_step_description">Tria fotos/vídeos d'aquest dispositiu. Tot el que triïs formarà un únic lot.</string>
+    <string name="queue_duplicate_check_prefix">Comprovació de duplicats: %1$s</string>
+    <string name="queue_button_replace_batch_media">Substitueix el contingut del lot</string>
+    <string name="queue_button_select_local_media">Tria contingut local</string>
+
+    <string name="sidebar_empty_title">Pas 2 · Edita les metadades del lot</string>
+    <string name="sidebar_empty_pick_media_first">Primer tria contingut per activar l'edició del lot.</string>
+    <string name="sidebar_empty_description">Quan hi hagi un lot carregat, els canvis d'aquest panell s'aplicaran a tots els elements no duplicats.</string>
+    <string name="sidebar_empty_catalog_counts">Àlbums carregats: %1$d | Etiquetes carregades: %2$d</string>
+
+    <string name="bulk_step_title">Pas 2 · Edita les metadades del lot</string>
+    <string name="bulk_batch_size">Mida del lot: %1$d elements</string>
+    <string name="bulk_description">Activa un camp, defineix-ne el valor i aplica'l a tots els elements no duplicats del lot.</string>
+    <string name="bulk_label_description">Descripció</string>
+    <string name="bulk_label_datetime_original">Data/hora original (ISO 8601)</string>
+    <string name="bulk_label_timezone">Zona horària (IANA, +02:00 o Z)</string>
+    <string name="bulk_favorite_button_true">Preferit = Sí</string>
+    <string name="bulk_favorite_button_false">Preferit = No</string>
+    <string name="bulk_album_title">Àlbum</string>
+    <string name="bulk_label_new_session_album">Nou àlbum de sessió</string>
+    <string name="bulk_button_create_select_album">Crea i selecciona l'àlbum</string>
+    <string name="bulk_tags_to_add_title">Etiquetes a afegir</string>
+    <string name="bulk_label_new_session_tag">Nova etiqueta de sessió</string>
+    <string name="bulk_button_create_select_tag">Crea i selecciona l'etiqueta</string>
+    <string name="bulk_toggle_show_advanced_fields">Mostra els camps avançats</string>
+    <string name="bulk_toggle_hide_advanced_fields">Amaga els camps avançats</string>
+    <string name="bulk_label_album_id_manual">ID d'àlbum (manual)</string>
+    <string name="bulk_label_add_tag_ids">Afegeix IDs d'etiqueta (separats per comes)</string>
+    <string name="bulk_label_remove_tag_ids">Elimina IDs d'etiqueta (separats per comes)</string>
+    <string name="bulk_button_apply_edits">Aplica els canvis al lot</string>
+    <string name="bulk_button_reset_draft">Reinicia l'esborrany del lot</string>
+    <string name="bulk_button_clear_staged">Neteja els canvis preparats del lot</string>
+
+    <string name="request_step_title">Pas 3 · Planifica i puja</string>
+    <string name="request_step_description">Genera el pla de peticions, revisa'l i després executa la pujada.</string>
+    <string name="request_button_generate_plan">Genera el pla</string>
+    <string name="request_button_execute_upload">Executa la pujada</string>
+    <string name="request_button_clear_plan">Neteja el pla</string>
+    <string name="request_button_clear_status">Neteja l'estat</string>
+    <string name="request_toggle_show_technical_status">Mostra l'estat tècnic</string>
+    <string name="request_toggle_hide_technical_status">Amaga l'estat tècnic</string>
+    <string name="request_plan_message">Missatge del pla: %1$s</string>
+    <string name="request_execution_status">Estat d'execució: %1$s</string>
+    <string name="request_execution_message">Missatge d'execució: %1$s</string>
+    <string name="request_submitted_requests">Peticions enviades: %1$d</string>
+
+    <string name="dryrun_step_title">Pas 4 · Revisa els detalls del pla</string>
+    <string name="dryrun_planned_operations">Operacions planificades: %1$d</string>
+    <string name="dryrun_upload_ops">Operacions de pujada: %1$d</string>
+    <string name="dryrun_metadata_ops">Operacions de metadades: %1$d</string>
+    <string name="dryrun_tag_ops">Operacions d'etiquetes: %1$d</string>
+    <string name="dryrun_album_ops">Operacions d'àlbum: %1$d</string>
+    <string name="dryrun_lookup_hooks">Cerques prèvies: %1$d</string>
+    <string name="dryrun_no_payload_preview">Encara no hi ha cap previsualització del payload.</string>
+    <string name="dryrun_toggle_show_payload_details">Mostra els detalls del payload</string>
+    <string name="dryrun_toggle_hide_payload_details">Amaga els detalls del payload</string>
+    <string name="dryrun_request_line">%1$d. %2$s %3$s</string>
+    <string name="dryrun_payload_line">Payload: %1$s</string>
+
+    <string name="asset_queue_empty">Encara no s'han triat fitxers.</string>
+    <string name="asset_tile_mime_size">%1$s - %2$d bytes</string>
+    <string name="asset_tile_capture_missing">Data de captura no disponible</string>
+    <string name="asset_tile_already_on_server">Ja existeix al servidor</string>
+    <string name="summary_language_label">Idioma</string>
+    <string name="summary_language_catalan">Català</string>
+    <string name="summary_language_english">English</string>
+    <string name="batch_feedback_dismiss">Tanca</string>
+    <string name="catalog_message_dismiss">Tanca el missatge</string>
+    <string name="feedback_level_error">Error</string>
+    <string name="feedback_level_warning">Avís</string>
+    <string name="feedback_level_success">Correcte</string>
+</resources>

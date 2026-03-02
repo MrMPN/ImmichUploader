@@ -16,6 +16,13 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import com.marcportabella.immichuploader.domain.LocalAsset
+import immichuploader.composeapp.generated.resources.Res
+import immichuploader.composeapp.generated.resources.asset_tile_already_on_server
+import immichuploader.composeapp.generated.resources.asset_tile_already_on_server_ca
+import immichuploader.composeapp.generated.resources.asset_tile_capture_missing
+import immichuploader.composeapp.generated.resources.asset_tile_capture_missing_ca
+import immichuploader.composeapp.generated.resources.asset_tile_mime_size
+import immichuploader.composeapp.generated.resources.asset_tile_mime_size_ca
 
 @Composable
 internal fun AssetQueueTile(
@@ -43,14 +50,23 @@ internal fun AssetQueueTile(
             )
 
             Text(
-                text = "${asset.mimeType} - ${asset.fileSizeBytes} bytes",
+                text = i18nString(
+                    english = Res.string.asset_tile_mime_size,
+                    catalan = Res.string.asset_tile_mime_size_ca,
+                    asset.mimeType,
+                    asset.fileSizeBytes
+                ),
                 style = MaterialTheme.typography.bodySmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
 
             Text(
-                text = metadata.captureDisplay ?: "Capture date not available",
+                text = metadata.captureDisplay
+                    ?: i18nString(
+                        english = Res.string.asset_tile_capture_missing,
+                        catalan = Res.string.asset_tile_capture_missing_ca
+                    ),
                 style = MaterialTheme.typography.bodySmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -58,7 +74,10 @@ internal fun AssetQueueTile(
 
             if (isDuplicate) {
                 Text(
-                    text = "Already on server",
+                    text = i18nString(
+                        english = Res.string.asset_tile_already_on_server,
+                        catalan = Res.string.asset_tile_already_on_server_ca
+                    ),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
