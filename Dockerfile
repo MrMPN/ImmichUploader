@@ -1,18 +1,7 @@
-FROM eclipse-temurin:21-jdk AS builder
-
-WORKDIR /app
-
-COPY gradle gradle
-COPY gradlew gradlew
-COPY gradle.properties settings.gradle.kts build.gradle.kts ./
-COPY composeApp composeApp
-
-RUN chmod +x gradlew && ./gradlew :composeApp:webRelease --no-daemon
-
 FROM nginx:1.27-alpine
 
 COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
-COPY --from=builder /app/composeApp/build/dist/wasmJs/productionExecutable/ /usr/share/nginx/html/
+COPY composeApp/build/dist/wasmJs/productionExecutable/ /usr/share/nginx/html/
 
 EXPOSE 8080
 

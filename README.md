@@ -48,7 +48,7 @@ The output is written to:
 
 This repo includes:
 
-- `Dockerfile` (builds release bundle and serves it with nginx)
+- `Dockerfile` (serves the prebuilt web bundle with nginx)
 - `docker/nginx.conf`
 - `.github/workflows/publish-web.yml` (pushes image to GHCR)
 

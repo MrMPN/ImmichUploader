@@ -24,6 +24,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      - name: Build web release bundle
+        env:
+          ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+        run: |
+          chmod +x gradlew
+          ./gradlew :composeApp:webRelease --no-daemon
+
       - name: Compute image name
         id: image
         run: |

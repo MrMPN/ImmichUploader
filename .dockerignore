@@ -5,7 +5,9 @@
 .idea
 .kotlin
 build
-composeApp/build
+composeApp/build/*
+!composeApp/build/dist/
+!composeApp/build/dist/**
 node_modules
 kotlin-js-store
 **/*.iml
