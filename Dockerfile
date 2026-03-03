@@ -1,0 +1,20 @@
+FROM eclipse-temurin:21-jdk AS builder
+
+WORKDIR /app
+
+COPY gradle gradle
+COPY gradlew gradlew
+COPY gradle.properties settings.gradle.kts build.gradle.kts ./
+COPY composeApp composeApp
+
+RUN chmod +x gradlew && ./gradlew :composeApp:webRelease --no-daemon
+
+FROM nginx:1.27-alpine
+
+COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=builder /app/composeApp/build/dist/wasmJs/productionExecutable/ /usr/share/nginx/html/
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD wget -qO- http://127.0.0.1:8080/healthz || exit 1

@@ -32,6 +32,30 @@ in your IDE's toolbar or run it directly from the terminal:
     .\gradlew.bat :composeApp:jsBrowserDevelopmentRun
     ```
 
+### Build Web Release Bundle
+
+To generate the production web bundle:
+
+```shell
+./gradlew :composeApp:webRelease
+```
+
+The output is written to:
+
+- `composeApp/build/dist/wasmJs/productionExecutable`
+
+### Docker + Unraid Deployment
+
+This repo includes:
+
+- `Dockerfile` (builds release bundle and serves it with nginx)
+- `docker/nginx.conf`
+- `.github/workflows/publish-web.yml` (pushes image to GHCR)
+
+Deployment details and Unraid compose example:
+
+- [docs/deploy-unraid.md](./docs/deploy-unraid.md)
+
 ---
 
 Learn more about [Kotlin Multiplatform](https://www.jetbrains.com/help/kotlin-multiplatform-dev/get-started.html),

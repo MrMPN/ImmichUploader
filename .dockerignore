@@ -1,0 +1,12 @@
+.git
+.github
+.gradle
+.gradle-local
+.idea
+.kotlin
+build
+composeApp/build
+node_modules
+kotlin-js-store
+**/*.iml
+**/.DS_Store
