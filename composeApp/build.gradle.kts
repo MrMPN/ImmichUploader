@@ -2,23 +2,6 @@ import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackConfig
-import java.util.Properties
-
-val bootstrapConfigOutputDir = layout.buildDirectory.dir("generated/source/bootstrapConfig/webMain/kotlin")
-val localPropertiesApiKey = providers.provider {
-    val propertiesFile = rootProject.layout.projectDirectory.file("local.properties").asFile
-    if (!propertiesFile.exists()) {
-        ""
-    } else {
-        val properties = Properties()
-        propertiesFile.inputStream().use(properties::load)
-        properties.getProperty("immich.apiKey", "")
-    }
-}
-val bootstrapApiKey = providers.gradleProperty("immichApiKey")
-    .orElse(providers.environmentVariable("IMMICH_API_KEY"))
-    .orElse(localPropertiesApiKey)
-    .orElse("")
 
 plugins {
     alias(libs.plugins.androidLibrary)
@@ -49,9 +32,6 @@ kotlin {
     sourceSets {
         // Browser runtime code lives in webMain; keep jsMain/wasmJsMain empty unless
         // target-specific Kotlin sources are intentionally introduced.
-        matching { it.name == "webMain" }.configureEach {
-            kotlin.srcDir(bootstrapConfigOutputDir)
-        }
         androidMain.dependencies {
             implementation(libs.logger.android)
             implementation(libs.ktor.client.okhttp)
@@ -102,19 +82,6 @@ android {
 dependencies {
     debugImplementation(libs.compose.uiTooling)
 }
-
-val bootstrapConfigFile = bootstrapConfigOutputDir.get()
-    .file("com/marcportabella/immichuploader/app/BootstrapConfig.kt")
-    .asFile
-bootstrapConfigFile.parentFile.mkdirs()
-val escapedApiKey = bootstrapApiKey.get().replace("\\", "\\\\").replace("\"", "\\\"")
-bootstrapConfigFile.writeText(
-    """
-    package com.marcportabella.immichuploader.app
-
-    internal const val BOOTSTRAP_IMMICH_API_KEY: String = "$escapedApiKey"
-    """.trimIndent() + "\n"
-)
 
 // Verification handoffs expect these task names for web checks.
 tasks.register("compileKotlinWeb") {

@@ -4,12 +4,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import com.marcportabella.immichuploader.data.ApiImmichOnlineCatalogTransport
 import com.marcportabella.immichuploader.data.ApiImmichOnlineTransport
+import com.marcportabella.immichuploader.data.ImmichApiExecutor
 import com.marcportabella.immichuploader.data.ApiKeyGatedImmichCatalogTransport
 import com.marcportabella.immichuploader.data.ApiKeyGatedImmichTransport
+import com.marcportabella.immichuploader.data.ImmichCatalogRequestBuilder
 import com.marcportabella.immichuploader.data.ImmichCatalogResult
 import com.marcportabella.immichuploader.data.ImmichBulkUploadCheckResult
 import com.marcportabella.immichuploader.data.ImmichRequestBuilder
 import com.marcportabella.immichuploader.data.ImmichTransportResult
+import com.marcportabella.immichuploader.data.defaultImmichApiExecutor
+import com.marcportabella.immichuploader.data.immichJson
 import com.marcportabella.immichuploader.data.toDomainCatalogEntry
 import com.marcportabella.immichuploader.domain.BulkEditDraft
 import com.marcportabella.immichuploader.domain.LocalAssetId
@@ -20,15 +24,26 @@ import com.marcportabella.immichuploader.domain.UploadPrepStore
 import com.marcportabella.immichuploader.domain.canApplyBulkEdit
 import com.marcportabella.immichuploader.domain.mapLocalIntakeFilesToAssets
 import com.marcportabella.immichuploader.domain.preflightBulkEditDraft
+import com.marcportabella.immichuploader.platform.diagnosticMessage
+import com.marcportabella.immichuploader.platform.platformLogError
 import com.marcportabella.immichuploader.platform.platformLogInfo
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+
+sealed interface ApiKeyOwnerLookupResult {
+    data object MissingApiKey : ApiKeyOwnerLookupResult
+    data class Success(val displayName: String) : ApiKeyOwnerLookupResult
+    data class Failed(val message: String) : ApiKeyOwnerLookupResult
+}
 
 class UploadPrepStateHolder(
     private val store: UploadPrepStore,
     private val transport: ApiKeyGatedImmichTransport = ApiKeyGatedImmichTransport(ApiImmichOnlineTransport()),
-    private val catalogTransport: ApiKeyGatedImmichCatalogTransport = ApiKeyGatedImmichCatalogTransport(ApiImmichOnlineCatalogTransport())
+    private val catalogTransport: ApiKeyGatedImmichCatalogTransport = ApiKeyGatedImmichCatalogTransport(ApiImmichOnlineCatalogTransport()),
+    private val apiExecutor: ImmichApiExecutor = defaultImmichApiExecutor()
 ) {
-    private var catalogLoadedAtInit = false
-
     val state: UploadPrepState
         get() = store.state
 
@@ -50,9 +65,6 @@ class UploadPrepStateHolder(
     }
 
     suspend fun loadCatalogAtInit() {
-        if (catalogLoadedAtInit) return
-        catalogLoadedAtInit = true
-
         dispatch(UploadPrepAction.CatalogRequestStarted)
         val apiKey = apiKeyOrNull
         when (val albumResult = catalogTransport.lookupAlbums(apiKey)) {
@@ -79,6 +91,37 @@ class UploadPrepStateHolder(
                     )
                 )
         }
+    }
+
+    fun setApiKey(value: String) {
+        dispatch(UploadPrepAction.SetApiKey(value.trim()))
+    }
+
+    suspend fun lookupApiKeyOwner(): ApiKeyOwnerLookupResult {
+        val apiKey = apiKeyOrNull ?: return ApiKeyOwnerLookupResult.MissingApiKey
+        val request = ImmichCatalogRequestBuilder.lookupCurrentUser()
+        return runCatching { apiExecutor.execute(request = request, apiKey = apiKey) }
+            .fold(
+                onSuccess = { response ->
+                    if (response.statusCode !in 200..299) {
+                        ApiKeyOwnerLookupResult.Failed("User lookup failed with HTTP ${response.statusCode}.")
+                    } else {
+                        val displayName = parseUserDisplayName(response.responseBody)
+                        if (displayName == null) {
+                            ApiKeyOwnerLookupResult.Failed("User lookup returned an unexpected payload.")
+                        } else {
+                            ApiKeyOwnerLookupResult.Success(displayName)
+                        }
+                    }
+                },
+                onFailure = { throwable ->
+                    val error = throwable.diagnosticMessage()
+                    platformLogError(
+                        "[immichuploader][auth] key owner lookup failed: ${throwable.diagnosticMessage()}"
+                    )
+                    ApiKeyOwnerLookupResult.Failed(error)
+                }
+            )
     }
 
     suspend fun executePlan() {
@@ -202,6 +245,18 @@ class UploadPrepStateHolder(
 
     private val apiKeyOrNull: String?
         get() = state.apiKey.ifBlank { null }
+
+    private fun parseUserDisplayName(responseBody: String): String? {
+        val root = runCatching { immichJson.parseToJsonElement(responseBody).jsonObject }.getOrNull() ?: return null
+        val candidate = extractDisplayName(root) ?: extractDisplayName(root["user"] as? JsonObject)
+        return candidate?.trim()?.takeIf { it.isNotEmpty() }
+    }
+
+    private fun extractDisplayName(root: JsonObject?): String? = root?.let {
+        it["name"]?.jsonPrimitive?.contentOrNull
+            ?: it["email"]?.jsonPrimitive?.contentOrNull
+            ?: it["id"]?.jsonPrimitive?.contentOrNull
+    }
 }
 
 @Composable

@@ -11,6 +11,7 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -28,6 +29,14 @@ import immichuploader.composeapp.generated.resources.summary_header_subtitle
 import immichuploader.composeapp.generated.resources.summary_header_subtitle_ca
 import immichuploader.composeapp.generated.resources.summary_header_title
 import immichuploader.composeapp.generated.resources.summary_header_title_ca
+import immichuploader.composeapp.generated.resources.summary_api_key_label
+import immichuploader.composeapp.generated.resources.summary_api_key_label_ca
+import immichuploader.composeapp.generated.resources.summary_api_key_owner
+import immichuploader.composeapp.generated.resources.summary_api_key_owner_ca
+import immichuploader.composeapp.generated.resources.summary_api_key_owner_lookup_failed
+import immichuploader.composeapp.generated.resources.summary_api_key_owner_lookup_failed_ca
+import immichuploader.composeapp.generated.resources.summary_api_key_owner_lookup_in_progress
+import immichuploader.composeapp.generated.resources.summary_api_key_owner_lookup_in_progress_ca
 import immichuploader.composeapp.generated.resources.summary_language_catalan
 import immichuploader.composeapp.generated.resources.summary_language_catalan_ca
 import immichuploader.composeapp.generated.resources.summary_language_english
@@ -62,6 +71,11 @@ import immichuploader.composeapp.generated.resources.summary_toggle_show_system_
 fun SummaryHeaderCard(
     uiLanguage: UiLanguage,
     onUiLanguageChange: (UiLanguage) -> Unit,
+    apiKey: String,
+    onApiKeyChange: (String) -> Unit,
+    keyOwnerName: String?,
+    keyOwnerLookupInProgress: Boolean,
+    keyOwnerLookupFailed: Boolean,
     assetCount: Int,
     batchCount: Int,
     stagedCount: Int,
@@ -133,6 +147,47 @@ fun SummaryHeaderCard(
                                 )
                             )
                         }
+                    }
+                    OutlinedTextField(
+                        value = apiKey,
+                        onValueChange = onApiKeyChange,
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        label = {
+                            Text(
+                                i18nString(
+                                    english = Res.string.summary_api_key_label,
+                                    catalan = Res.string.summary_api_key_label_ca
+                                )
+                            )
+                        }
+                    )
+                    when {
+                        keyOwnerLookupInProgress -> Text(
+                            text = i18nString(
+                                english = Res.string.summary_api_key_owner_lookup_in_progress,
+                                catalan = Res.string.summary_api_key_owner_lookup_in_progress_ca
+                            ),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+
+                        keyOwnerName != null -> Text(
+                            text = i18nString(
+                                Res.string.summary_api_key_owner,
+                                Res.string.summary_api_key_owner_ca,
+                                keyOwnerName
+                            ),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+
+                        keyOwnerLookupFailed -> Text(
+                            text = i18nString(
+                                english = Res.string.summary_api_key_owner_lookup_failed,
+                                catalan = Res.string.summary_api_key_owner_lookup_failed_ca
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
                     }
                     FlowRow(
                         modifier = Modifier.fillMaxWidth(),
@@ -260,6 +315,11 @@ private fun SummaryHeaderCardPreview() {
         SummaryHeaderCard(
             uiLanguage = UiLanguage.Catalan,
             onUiLanguageChange = {},
+            apiKey = "your-api-key",
+            onApiKeyChange = {},
+            keyOwnerName = "Marc",
+            keyOwnerLookupInProgress = false,
+            keyOwnerLookupFailed = false,
             assetCount = 12,
             batchCount = 11,
             stagedCount = 2,

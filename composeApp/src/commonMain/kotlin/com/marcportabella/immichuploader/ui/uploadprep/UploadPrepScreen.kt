@@ -2,14 +2,18 @@ package com.marcportabella.immichuploader.ui.uploadprep
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import com.marcportabella.immichuploader.domain.UploadPrepStore
 import com.marcportabella.immichuploader.platform.BindPlatformFileInput
 import com.marcportabella.immichuploader.platform.openPlatformFilePicker
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
@@ -17,11 +21,15 @@ fun UploadPrepScreen(
     store: UploadPrepStore,
     uiLanguage: UiLanguage = UiLanguage.Catalan,
     onUiLanguageChange: (UiLanguage) -> Unit = {},
+    onPersistApiKey: (String) -> Unit = {},
     enableWebEffects: Boolean = true
 ) {
     val stateHolder = rememberUploadPrepStateHolder(store)
     val state = stateHolder.state
     val scope = rememberCoroutineScope()
+    var keyOwnerName by remember { mutableStateOf<String?>(null) }
+    var keyOwnerLookupInProgress by remember { mutableStateOf(false) }
+    var keyOwnerLookupFailed by remember { mutableStateOf(false) }
     val sortedAssets = remember(state.assets) {
         state.assets.values.sortedBy { it.fileName }
     }
@@ -34,6 +42,9 @@ fun UploadPrepScreen(
 
     if (enableWebEffects) {
         LaunchedEffect(state.apiKey) {
+            if (state.apiKey.isNotBlank()) {
+                delay(350)
+            }
             stateHolder.loadCatalogAtInit()
         }
     }
@@ -41,8 +52,43 @@ fun UploadPrepScreen(
     if (enableWebEffects) {
         LaunchedEffect(state.apiKey, state.assets.size) {
             if (state.assets.isNotEmpty()) {
+                if (state.apiKey.isNotBlank()) {
+                    delay(350)
+                }
                 stateHolder.runDuplicateCheckForCurrentAssets()
             }
+        }
+    }
+
+    if (enableWebEffects) {
+        LaunchedEffect(state.apiKey) {
+            if (state.apiKey.isBlank()) {
+                keyOwnerName = null
+                keyOwnerLookupInProgress = false
+                keyOwnerLookupFailed = false
+                return@LaunchedEffect
+            }
+            keyOwnerLookupInProgress = true
+            keyOwnerLookupFailed = false
+            keyOwnerName = null
+            delay(350)
+            when (val result = stateHolder.lookupApiKeyOwner()) {
+                ApiKeyOwnerLookupResult.MissingApiKey -> {
+                    keyOwnerName = null
+                    keyOwnerLookupFailed = false
+                }
+
+                is ApiKeyOwnerLookupResult.Success -> {
+                    keyOwnerName = result.displayName
+                    keyOwnerLookupFailed = false
+                }
+
+                is ApiKeyOwnerLookupResult.Failed -> {
+                    keyOwnerName = null
+                    keyOwnerLookupFailed = true
+                }
+            }
+            keyOwnerLookupInProgress = false
         }
     }
 
@@ -50,6 +96,13 @@ fun UploadPrepScreen(
         state = state,
         uiLanguage = uiLanguage,
         onUiLanguageChange = onUiLanguageChange,
+        onApiKeyChange = { nextValue ->
+            stateHolder.setApiKey(nextValue)
+            onPersistApiKey(nextValue)
+        },
+        keyOwnerName = keyOwnerName,
+        keyOwnerLookupInProgress = keyOwnerLookupInProgress,
+        keyOwnerLookupFailed = keyOwnerLookupFailed,
         gateStatus = stateHolder.gateStatus,
         executionPath = stateHolder.executionPath,
         catalogGateStatus = stateHolder.catalogGateStatus,
@@ -83,6 +136,7 @@ private fun UploadPrepScreenRoutePreview(
             store = previewStore,
             uiLanguage = UiLanguage.Catalan,
             onUiLanguageChange = {},
+            onPersistApiKey = {},
             enableWebEffects = false
         )
     }

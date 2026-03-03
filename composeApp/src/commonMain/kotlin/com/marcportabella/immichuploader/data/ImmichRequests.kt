@@ -119,6 +119,12 @@ object ImmichCatalogRequestBuilder {
             url = "$IMMICH_API_BASE_URL/tags"
         )
 
+    fun lookupCurrentUser(): ImmichApiRequest =
+        ImmichApiRequest(
+            method = "GET",
+            url = "$IMMICH_API_BASE_URL/users/me"
+        )
+
     fun createAlbum(name: String): ImmichApiRequest =
         ImmichApiRequest(
             method = "POST",

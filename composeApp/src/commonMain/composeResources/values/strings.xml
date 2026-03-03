@@ -155,6 +155,14 @@
     <string name="summary_language_label_ca">Idioma</string>
     <string name="summary_language_catalan_ca">Català</string>
     <string name="summary_language_english_ca">English</string>
+    <string name="summary_api_key_label">Immich API key</string>
+    <string name="summary_api_key_label_ca">Clau API d'Immich</string>
+    <string name="summary_api_key_owner">Key owner: %1$s</string>
+    <string name="summary_api_key_owner_ca">Propietari de la clau: %1$s</string>
+    <string name="summary_api_key_owner_lookup_in_progress">Resolving key owner…</string>
+    <string name="summary_api_key_owner_lookup_in_progress_ca">S'està comprovant el propietari de la clau…</string>
+    <string name="summary_api_key_owner_lookup_failed">Could not resolve key owner. Check the API key.</string>
+    <string name="summary_api_key_owner_lookup_failed_ca">No s'ha pogut validar el propietari de la clau. Revisa la clau API.</string>
     <string name="batch_feedback_dismiss">Dismiss</string>
     <string name="batch_feedback_dismiss_ca">Tanca</string>
     <string name="catalog_message_dismiss">Dismiss message</string>

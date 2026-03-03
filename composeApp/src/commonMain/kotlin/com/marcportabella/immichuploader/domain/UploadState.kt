@@ -458,13 +458,18 @@ fun reduceUploadPrepState(state: UploadPrepState, action: UploadPrepAction): Upl
         is UploadPrepAction.UploadExecutionStarted -> state.copy(
             executionStatus = UploadExecutionStatus.Executing,
             executionMessage = action.message,
-            executionRequestCount = null
+            executionRequestCount = null,
+            batchFeedback = null
         )
 
         is UploadPrepAction.UploadExecutionBlocked -> state.copy(
             executionStatus = UploadExecutionStatus.BlockedMissingApiKey,
             executionMessage = action.message,
-            executionRequestCount = null
+            executionRequestCount = null,
+            batchFeedback = BatchFeedback(
+                level = BatchFeedbackLevel.Error,
+                message = action.message
+            )
         )
 
         is UploadPrepAction.UploadExecutionSubmitted -> state.copy(

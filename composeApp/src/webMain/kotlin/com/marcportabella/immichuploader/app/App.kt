@@ -83,9 +83,12 @@ fun App() {
     )
 
     MaterialTheme(colorScheme = colorScheme, typography = typography) {
+        val initialApiKey = remember {
+            loadPersistedApiKey().orEmpty()
+        }
         val store = remember {
             UploadPrepStore(
-                UploadPrepState(apiKey = BOOTSTRAP_IMMICH_API_KEY)
+                UploadPrepState(apiKey = initialApiKey)
             )
         }
         var uiLanguage by rememberSaveable { mutableStateOf(UiLanguage.Catalan) }
@@ -93,7 +96,8 @@ fun App() {
             UploadPrepScreen(
                 store = store,
                 uiLanguage = uiLanguage,
-                onUiLanguageChange = { uiLanguage = it }
+                onUiLanguageChange = { uiLanguage = it },
+                onPersistApiKey = { persistApiKey(it) }
             )
         }
     }
