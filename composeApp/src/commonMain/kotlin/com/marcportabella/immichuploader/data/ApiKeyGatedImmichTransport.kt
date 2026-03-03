@@ -4,16 +4,29 @@ class ApiKeyGatedImmichTransport(
     private val onlineTransport: ImmichOnlineTransport
 ) : ImmichTransport {
 
-    fun selectExecutionPath(apiKey: String?): UploadExecutionPath =
-        if (apiKey.isNullOrBlank()) UploadExecutionPath.BlockedMissingApiKey else UploadExecutionPath.ApiExecution
-
-    fun gateStatus(apiKey: String?): TransportGateStatus =
-        if (apiKey.isNullOrBlank()) TransportGateStatus.MissingApiKey else TransportGateStatus.Ready
-
-    override suspend fun submit(plan: ImmichRequestPlan, apiKey: String?): ImmichTransportResult {
-        if (selectExecutionPath(apiKey) == UploadExecutionPath.BlockedMissingApiKey) {
-            return ImmichTransportResult.BlockedMissingApiKey(plan)
+    fun selectExecutionPath(apiKey: String?, serverBaseUrl: String?): UploadExecutionPath =
+        when {
+            apiKey.isNullOrBlank() -> UploadExecutionPath.BlockedMissingApiKey
+            normalizeImmichApiBaseUrl(serverBaseUrl.orEmpty()).isBlank() -> UploadExecutionPath.BlockedMissingServerBaseUrl
+            else -> UploadExecutionPath.ApiExecution
         }
-        return onlineTransport.submit(plan, apiKey.orEmpty())
+
+    fun gateStatus(apiKey: String?, serverBaseUrl: String?): TransportGateStatus =
+        when (selectExecutionPath(apiKey = apiKey, serverBaseUrl = serverBaseUrl)) {
+            UploadExecutionPath.BlockedMissingApiKey -> TransportGateStatus.MissingApiKey
+            UploadExecutionPath.BlockedMissingServerBaseUrl -> TransportGateStatus.MissingServerBaseUrl
+            UploadExecutionPath.ApiExecution -> TransportGateStatus.Ready
+        }
+
+    override suspend fun submit(plan: ImmichRequestPlan, apiKey: String?, serverBaseUrl: String?): ImmichTransportResult {
+        return when (selectExecutionPath(apiKey = apiKey, serverBaseUrl = serverBaseUrl)) {
+            UploadExecutionPath.BlockedMissingApiKey -> ImmichTransportResult.BlockedMissingApiKey(plan)
+            UploadExecutionPath.BlockedMissingServerBaseUrl -> ImmichTransportResult.BlockedMissingServerBaseUrl(plan)
+            UploadExecutionPath.ApiExecution -> onlineTransport.submit(
+                plan = plan,
+                apiKey = apiKey.orEmpty(),
+                serverBaseUrl = normalizeImmichApiBaseUrl(serverBaseUrl.orEmpty())
+            )
+        }
     }
 }

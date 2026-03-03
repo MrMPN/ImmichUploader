@@ -1,6 +1,5 @@
 package com.marcportabella.immichuploader
 
-import com.marcportabella.immichuploader.data.IMMICH_API_BASE_URL
 import com.marcportabella.immichuploader.data.ImmichAlbumCreateBody
 import com.marcportabella.immichuploader.data.ImmichApiRequest
 import com.marcportabella.immichuploader.data.ImmichBulkMetadataBody
@@ -23,6 +22,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class UploadRequestPlannerSliceWebTest {
+    private val testApiBaseUrl = "https://immich.test/api"
 
     @Test
     fun bulkMetadataBuilderCreatesRequestWhenPatchContainsMetadataFields() {
@@ -176,18 +176,18 @@ class UploadRequestPlannerSliceWebTest {
         )
 
         val plan = ImmichRequestBuilder.buildDryRunPlan(state)
-        val requests = ImmichRequestBuilder.buildPayloadInspectorRequests(plan)
+        val requests = ImmichRequestBuilder.buildPayloadInspectorRequests(plan, testApiBaseUrl)
 
-        assertTrue(requests.any { it.method == "POST" && it.url == "$IMMICH_API_BASE_URL/assets" })
-        assertTrue(requests.any { it.method == "PUT" && it.url == "$IMMICH_API_BASE_URL/assets/updateAssets" })
+        assertTrue(requests.any { it.method == "POST" && it.url == "$testApiBaseUrl/assets" })
+        assertTrue(requests.any { it.method == "PUT" && it.url == "$testApiBaseUrl/assets/updateAssets" })
         assertTrue(
             requests.any {
                 it.method == "PUT" &&
-                    it.url.startsWith("$IMMICH_API_BASE_URL/tags/") &&
+                    it.url.startsWith("$testApiBaseUrl/tags/") &&
                     it.url.endsWith("/assets")
             }
         )
-        assertTrue(requests.any { it.method == "PUT" && it.url == "$IMMICH_API_BASE_URL/albums/assets" })
+        assertTrue(requests.any { it.method == "PUT" && it.url == "$testApiBaseUrl/albums/assets" })
         assertTrue(
             requests.any {
                 val payload = (it.body as? ImmichUploadBody)?.payload
@@ -218,8 +218,8 @@ class UploadRequestPlannerSliceWebTest {
         )
 
         val plan = ImmichRequestBuilder.buildDryRunPlan(state)
-        val requests = ImmichRequestBuilder.buildPayloadInspectorRequests(plan)
-        val metadataRequest = requests.first { it.url == "$IMMICH_API_BASE_URL/assets/updateAssets" }
+        val requests = ImmichRequestBuilder.buildPayloadInspectorRequests(plan, testApiBaseUrl)
+        val metadataRequest = requests.first { it.url == "$testApiBaseUrl/assets/updateAssets" }
         val body = (metadataRequest.body as? ImmichBulkMetadataBody)?.payload
         assertNotNull(body)
 
@@ -253,11 +253,11 @@ class UploadRequestPlannerSliceWebTest {
             )
         )
 
-        val requests = ImmichRequestBuilder.buildPayloadInspectorRequests(requestPlan)
-        val createAlbum = requests.first { it.url == "$IMMICH_API_BASE_URL/albums" }
-        val createTag = requests.first { it.url == "$IMMICH_API_BASE_URL/tags" }
-        val upload = requests.first { it.url == "$IMMICH_API_BASE_URL/assets" }
-        val metadata = requests.first { it.url == "$IMMICH_API_BASE_URL/assets/updateAssets" }
+        val requests = ImmichRequestBuilder.buildPayloadInspectorRequests(requestPlan, testApiBaseUrl)
+        val createAlbum = requests.first { it.url == "$testApiBaseUrl/albums" }
+        val createTag = requests.first { it.url == "$testApiBaseUrl/tags" }
+        val upload = requests.first { it.url == "$testApiBaseUrl/assets" }
+        val metadata = requests.first { it.url == "$testApiBaseUrl/assets/updateAssets" }
         val createAlbumBody = (createAlbum.body as? ImmichAlbumCreateBody)?.payload
         val createTagBody = (createTag.body as? ImmichTagCreateBody)?.payload
         val uploadBody = (upload.body as? ImmichUploadBody)?.payload
@@ -277,27 +277,27 @@ class UploadRequestPlannerSliceWebTest {
 
     @Test
     fun catalogRequestBuilderUsesFixedBaseUrlContracts() {
-        val albumsLookup = com.marcportabella.immichuploader.data.ImmichCatalogRequestBuilder.lookupAlbums()
-        val tagsLookup = com.marcportabella.immichuploader.data.ImmichCatalogRequestBuilder.lookupTags()
-        val createAlbum = com.marcportabella.immichuploader.data.ImmichCatalogRequestBuilder.createAlbum("Family")
-        val createTag = com.marcportabella.immichuploader.data.ImmichCatalogRequestBuilder.createTag("Trip")
+        val albumsLookup = com.marcportabella.immichuploader.data.ImmichCatalogRequestBuilder.lookupAlbums(testApiBaseUrl)
+        val tagsLookup = com.marcportabella.immichuploader.data.ImmichCatalogRequestBuilder.lookupTags(testApiBaseUrl)
+        val createAlbum = com.marcportabella.immichuploader.data.ImmichCatalogRequestBuilder.createAlbum(testApiBaseUrl, "Family")
+        val createTag = com.marcportabella.immichuploader.data.ImmichCatalogRequestBuilder.createTag(testApiBaseUrl, "Trip")
 
         assertEquals("GET", albumsLookup.method)
-        assertEquals("$IMMICH_API_BASE_URL/albums", albumsLookup.url)
+        assertEquals("$testApiBaseUrl/albums", albumsLookup.url)
         assertNull(albumsLookup.body)
 
         assertEquals("GET", tagsLookup.method)
-        assertEquals("$IMMICH_API_BASE_URL/tags", tagsLookup.url)
+        assertEquals("$testApiBaseUrl/tags", tagsLookup.url)
         assertNull(tagsLookup.body)
 
         assertEquals("POST", createAlbum.method)
-        assertEquals("$IMMICH_API_BASE_URL/albums", createAlbum.url)
+        assertEquals("$testApiBaseUrl/albums", createAlbum.url)
         val createAlbumBody = (createAlbum.body as? ImmichAlbumCreateBody)?.payload
         assertNotNull(createAlbumBody)
         assertEquals("Family", createAlbumBody.name)
 
         assertEquals("POST", createTag.method)
-        assertEquals("$IMMICH_API_BASE_URL/tags", createTag.url)
+        assertEquals("$testApiBaseUrl/tags", createTag.url)
         val createTagBody = (createTag.body as? ImmichTagCreateBody)?.payload
         assertNotNull(createTagBody)
         assertEquals("Trip", createTagBody.name)
@@ -305,9 +305,9 @@ class UploadRequestPlannerSliceWebTest {
 
     @Test
     fun payloadInspectorResultShapeIsStable() {
-        val request = ImmichApiRequest("GET", "$IMMICH_API_BASE_URL/albums", null)
+        val request = ImmichApiRequest("GET", "$testApiBaseUrl/albums", null)
         assertEquals("GET", request.method)
-        assertEquals("$IMMICH_API_BASE_URL/albums", request.url)
+        assertEquals("$testApiBaseUrl/albums", request.url)
         assertNull(request.body)
     }
 

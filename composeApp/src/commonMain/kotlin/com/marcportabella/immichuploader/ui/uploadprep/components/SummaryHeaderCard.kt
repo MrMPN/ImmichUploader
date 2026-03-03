@@ -37,6 +37,8 @@ import immichuploader.composeapp.generated.resources.summary_api_key_owner_looku
 import immichuploader.composeapp.generated.resources.summary_api_key_owner_lookup_failed_ca
 import immichuploader.composeapp.generated.resources.summary_api_key_owner_lookup_in_progress
 import immichuploader.composeapp.generated.resources.summary_api_key_owner_lookup_in_progress_ca
+import immichuploader.composeapp.generated.resources.summary_server_url_label
+import immichuploader.composeapp.generated.resources.summary_server_url_label_ca
 import immichuploader.composeapp.generated.resources.summary_language_catalan
 import immichuploader.composeapp.generated.resources.summary_language_catalan_ca
 import immichuploader.composeapp.generated.resources.summary_language_english
@@ -73,6 +75,8 @@ fun SummaryHeaderCard(
     onUiLanguageChange: (UiLanguage) -> Unit,
     apiKey: String,
     onApiKeyChange: (String) -> Unit,
+    serverBaseUrl: String,
+    onServerBaseUrlChange: (String) -> Unit,
     keyOwnerName: String?,
     keyOwnerLookupInProgress: Boolean,
     keyOwnerLookupFailed: Boolean,
@@ -148,6 +152,20 @@ fun SummaryHeaderCard(
                             )
                         }
                     }
+                    OutlinedTextField(
+                        value = serverBaseUrl,
+                        onValueChange = onServerBaseUrlChange,
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        label = {
+                            Text(
+                                i18nString(
+                                    english = Res.string.summary_server_url_label,
+                                    catalan = Res.string.summary_server_url_label_ca
+                                )
+                            )
+                        }
+                    )
                     OutlinedTextField(
                         value = apiKey,
                         onValueChange = onApiKeyChange,
@@ -317,6 +335,8 @@ private fun SummaryHeaderCardPreview() {
             onUiLanguageChange = {},
             apiKey = "your-api-key",
             onApiKeyChange = {},
+            serverBaseUrl = "https://immich.example/api",
+            onServerBaseUrlChange = {},
             keyOwnerName = "Marc",
             keyOwnerLookupInProgress = false,
             keyOwnerLookupFailed = false,

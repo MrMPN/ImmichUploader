@@ -22,6 +22,7 @@ fun UploadPrepScreen(
     uiLanguage: UiLanguage = UiLanguage.Catalan,
     onUiLanguageChange: (UiLanguage) -> Unit = {},
     onPersistApiKey: (String) -> Unit = {},
+    onPersistServerBaseUrl: (String) -> Unit = {},
     enableWebEffects: Boolean = true
 ) {
     val stateHolder = rememberUploadPrepStateHolder(store)
@@ -41,28 +42,26 @@ fun UploadPrepScreen(
     }
 
     if (enableWebEffects) {
-        LaunchedEffect(state.apiKey) {
-            if (state.apiKey.isNotBlank()) {
+        LaunchedEffect(state.apiKey, state.serverBaseUrl) {
+            if (state.apiKey.isNotBlank() && state.serverBaseUrl.isNotBlank()) {
                 delay(350)
+                stateHolder.loadCatalogAtInit()
             }
-            stateHolder.loadCatalogAtInit()
         }
     }
 
     if (enableWebEffects) {
-        LaunchedEffect(state.apiKey, state.assets.size) {
-            if (state.assets.isNotEmpty()) {
-                if (state.apiKey.isNotBlank()) {
-                    delay(350)
-                }
+        LaunchedEffect(state.apiKey, state.serverBaseUrl, state.assets.size) {
+            if (state.assets.isNotEmpty() && state.apiKey.isNotBlank() && state.serverBaseUrl.isNotBlank()) {
+                delay(350)
                 stateHolder.runDuplicateCheckForCurrentAssets()
             }
         }
     }
 
     if (enableWebEffects) {
-        LaunchedEffect(state.apiKey) {
-            if (state.apiKey.isBlank()) {
+        LaunchedEffect(state.apiKey, state.serverBaseUrl) {
+            if (state.apiKey.isBlank() || state.serverBaseUrl.isBlank()) {
                 keyOwnerName = null
                 keyOwnerLookupInProgress = false
                 keyOwnerLookupFailed = false
@@ -99,6 +98,10 @@ fun UploadPrepScreen(
         onApiKeyChange = { nextValue ->
             stateHolder.setApiKey(nextValue)
             onPersistApiKey(nextValue)
+        },
+        onServerBaseUrlChange = { nextValue ->
+            stateHolder.setServerBaseUrl(nextValue)
+            onPersistServerBaseUrl(nextValue)
         },
         keyOwnerName = keyOwnerName,
         keyOwnerLookupInProgress = keyOwnerLookupInProgress,
@@ -137,6 +140,7 @@ private fun UploadPrepScreenRoutePreview(
             uiLanguage = UiLanguage.Catalan,
             onUiLanguageChange = {},
             onPersistApiKey = {},
+            onPersistServerBaseUrl = {},
             enableWebEffects = false
         )
     }

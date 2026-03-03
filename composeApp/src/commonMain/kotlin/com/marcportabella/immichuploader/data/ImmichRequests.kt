@@ -18,11 +18,27 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
-const val IMMICH_API_BASE_URL: String = "https://fotos.marcportabella.com/api"
 internal val immichJson: Json = Json {
     encodeDefaults = false
     explicitNulls = false
     ignoreUnknownKeys = true
+}
+
+fun normalizeImmichApiBaseUrl(rawValue: String): String {
+    val trimmed = rawValue.trim().trimEnd('/')
+    if (trimmed.isEmpty()) return ""
+    val withScheme = if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+        trimmed
+    } else {
+        "https://$trimmed"
+    }
+    return if (withScheme.endsWith("/api")) withScheme else "$withScheme/api"
+}
+
+fun buildImmichApiUrl(apiBaseUrl: String, endpointPath: String): String {
+    val normalizedBase = normalizeImmichApiBaseUrl(apiBaseUrl).trimEnd('/')
+    val normalizedPath = endpointPath.trim().removePrefix("/")
+    return "$normalizedBase/$normalizedPath"
 }
 
 data class ImmichUploadRequest(
@@ -107,42 +123,42 @@ data class ImmichApiRequest(
 )
 
 object ImmichCatalogRequestBuilder {
-    fun lookupAlbums(): ImmichApiRequest =
+    fun lookupAlbums(apiBaseUrl: String): ImmichApiRequest =
         ImmichApiRequest(
             method = "GET",
-            url = "$IMMICH_API_BASE_URL/albums"
+            url = buildImmichApiUrl(apiBaseUrl, "albums")
         )
 
-    fun lookupTags(): ImmichApiRequest =
+    fun lookupTags(apiBaseUrl: String): ImmichApiRequest =
         ImmichApiRequest(
             method = "GET",
-            url = "$IMMICH_API_BASE_URL/tags"
+            url = buildImmichApiUrl(apiBaseUrl, "tags")
         )
 
-    fun lookupCurrentUser(): ImmichApiRequest =
+    fun lookupCurrentUser(apiBaseUrl: String): ImmichApiRequest =
         ImmichApiRequest(
             method = "GET",
-            url = "$IMMICH_API_BASE_URL/users/me"
+            url = buildImmichApiUrl(apiBaseUrl, "users/me")
         )
 
-    fun createAlbum(name: String): ImmichApiRequest =
+    fun createAlbum(apiBaseUrl: String, name: String): ImmichApiRequest =
         ImmichApiRequest(
             method = "POST",
-            url = "$IMMICH_API_BASE_URL/albums",
+            url = buildImmichApiUrl(apiBaseUrl, "albums"),
             body = ImmichAlbumCreateBody(ImmichAlbumCreateRequest(name.trim()))
         )
 
-    fun createTag(name: String): ImmichApiRequest =
+    fun createTag(apiBaseUrl: String, name: String): ImmichApiRequest =
         ImmichApiRequest(
             method = "POST",
-            url = "$IMMICH_API_BASE_URL/tags",
+            url = buildImmichApiUrl(apiBaseUrl, "tags"),
             body = ImmichTagCreateBody(ImmichTagCreateRequest(name.trim()))
         )
 
-    fun bulkUploadCheck(items: List<ImmichBulkUploadCheckItem>): ImmichApiRequest =
+    fun bulkUploadCheck(apiBaseUrl: String, items: List<ImmichBulkUploadCheckItem>): ImmichApiRequest =
         ImmichApiRequest(
             method = "POST",
-            url = "$IMMICH_API_BASE_URL/assets/bulk-upload-check",
+            url = buildImmichApiUrl(apiBaseUrl, "assets/bulk-upload-check"),
             body = ImmichBulkUploadCheckBody(
                 ImmichBulkUploadCheckRequest(
                     assets = items.distinctBy { it.id }.sortedBy { it.id }
@@ -292,22 +308,22 @@ object ImmichRequestBuilder {
         )
     }
 
-    fun buildPayloadInspectorRequests(plan: ImmichRequestPlan): List<ImmichApiRequest> {
+    fun buildPayloadInspectorRequests(plan: ImmichRequestPlan, apiBaseUrl: String): List<ImmichApiRequest> {
         val requests = mutableListOf<ImmichApiRequest>()
 
         plan.lookupHooks.forEach { hook ->
             requests += when (hook) {
-                ImmichLookupHook.LookupAlbums -> ImmichCatalogRequestBuilder.lookupAlbums()
-                ImmichLookupHook.LookupTags -> ImmichCatalogRequestBuilder.lookupTags()
-                is ImmichLookupHook.CreateAlbumIfMissing -> ImmichCatalogRequestBuilder.createAlbum(hook.name)
-                is ImmichLookupHook.CreateTagIfMissing -> ImmichCatalogRequestBuilder.createTag(hook.name)
+                ImmichLookupHook.LookupAlbums -> ImmichCatalogRequestBuilder.lookupAlbums(apiBaseUrl)
+                ImmichLookupHook.LookupTags -> ImmichCatalogRequestBuilder.lookupTags(apiBaseUrl)
+                is ImmichLookupHook.CreateAlbumIfMissing -> ImmichCatalogRequestBuilder.createAlbum(apiBaseUrl, hook.name)
+                is ImmichLookupHook.CreateTagIfMissing -> ImmichCatalogRequestBuilder.createTag(apiBaseUrl, hook.name)
             }
         }
 
         plan.uploadRequests.forEach { request ->
             requests += ImmichApiRequest(
                 method = "POST",
-                url = "$IMMICH_API_BASE_URL/assets",
+                url = buildImmichApiUrl(apiBaseUrl, "assets"),
                 body = request.toApiBody()
             )
         }
@@ -315,7 +331,7 @@ object ImmichRequestBuilder {
         plan.bulkMetadataRequests.forEach { request ->
             requests += ImmichApiRequest(
                 method = "PUT",
-                url = "$IMMICH_API_BASE_URL/assets/updateAssets",
+                url = buildImmichApiUrl(apiBaseUrl, "assets/updateAssets"),
                 body = request.toApiBody()
             )
         }
@@ -325,7 +341,7 @@ object ImmichRequestBuilder {
             request.tagIds.sorted().forEach { tagId ->
                 requests += ImmichApiRequest(
                     method = "PUT",
-                    url = "$IMMICH_API_BASE_URL/tags/$tagId/assets",
+                    url = buildImmichApiUrl(apiBaseUrl, "tags/$tagId/assets"),
                     body = ImmichTagAssetsBody(ImmichTagAssetsRequest(ids = assetIds))
                 )
             }
@@ -334,7 +350,7 @@ object ImmichRequestBuilder {
         plan.albumAddRequests.forEach { request ->
             requests += ImmichApiRequest(
                 method = "PUT",
-                url = "$IMMICH_API_BASE_URL/albums/assets",
+                url = buildImmichApiUrl(apiBaseUrl, "albums/assets"),
                 body = request.toApiBody()
             )
         }

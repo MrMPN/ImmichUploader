@@ -157,6 +157,8 @@
     <string name="summary_language_english_ca">English</string>
     <string name="summary_api_key_label">Immich API key</string>
     <string name="summary_api_key_label_ca">Clau API d'Immich</string>
+    <string name="summary_server_url_label">Immich server URL</string>
+    <string name="summary_server_url_label_ca">URL del servidor Immich</string>
     <string name="summary_api_key_owner">Key owner: %1$s</string>
     <string name="summary_api_key_owner_ca">Propietari de la clau: %1$s</string>
     <string name="summary_api_key_owner_lookup_in_progress">Resolving key owner…</string>

@@ -9,8 +9,8 @@ import com.marcportabella.immichuploader.platform.platformLogInfo
 class ApiImmichOnlineCatalogTransport(
     private val executor: ImmichApiExecutor = defaultImmichApiExecutor()
 ) : ImmichOnlineCatalogTransport {
-    override suspend fun lookupAlbums(apiKey: String): ImmichCatalogResult.Success {
-        val request = ImmichCatalogRequestBuilder.lookupAlbums()
+    override suspend fun lookupAlbums(apiKey: String, serverBaseUrl: String): ImmichCatalogResult.Success {
+        val request = ImmichCatalogRequestBuilder.lookupAlbums(serverBaseUrl)
         val execution = execute(request, apiKey)
         val result = execution.result
         val entries = if (result != null && result.statusCode in 200..299) {
@@ -28,8 +28,8 @@ class ApiImmichOnlineCatalogTransport(
         return ImmichCatalogResult.Success(request = request, entries = entries, message = message)
     }
 
-    override suspend fun lookupTags(apiKey: String): ImmichCatalogResult.Success {
-        val request = ImmichCatalogRequestBuilder.lookupTags()
+    override suspend fun lookupTags(apiKey: String, serverBaseUrl: String): ImmichCatalogResult.Success {
+        val request = ImmichCatalogRequestBuilder.lookupTags(serverBaseUrl)
         val execution = execute(request, apiKey)
         val result = execution.result
         val entries = if (result != null && result.statusCode in 200..299) {
@@ -47,8 +47,8 @@ class ApiImmichOnlineCatalogTransport(
         return ImmichCatalogResult.Success(request = request, entries = entries, message = message)
     }
 
-    override suspend fun createAlbumIfMissing(apiKey: String, name: String): ImmichCatalogResult.Success {
-        val request = ImmichCatalogRequestBuilder.createAlbum(name)
+    override suspend fun createAlbumIfMissing(apiKey: String, serverBaseUrl: String, name: String): ImmichCatalogResult.Success {
+        val request = ImmichCatalogRequestBuilder.createAlbum(serverBaseUrl, name)
         val createExecution = execute(request, apiKey)
         val createResult = createExecution.result ?: return ImmichCatalogResult.Success(
             request = request,
@@ -56,7 +56,7 @@ class ApiImmichOnlineCatalogTransport(
             message = "Album create failed before response: ${createExecution.errorMessage ?: "unknown network error"}"
         )
         return if (createResult.statusCode in 200..299 || createResult.statusCode == 409) {
-            val refreshed = lookupAlbums(apiKey)
+            val refreshed = lookupAlbums(apiKey = apiKey, serverBaseUrl = serverBaseUrl)
             refreshed.copy(message = "Album ensure requested for \"$name\". ${refreshed.message}")
         } else {
             ImmichCatalogResult.Success(
@@ -67,8 +67,8 @@ class ApiImmichOnlineCatalogTransport(
         }
     }
 
-    override suspend fun createTagIfMissing(apiKey: String, name: String): ImmichCatalogResult.Success {
-        val request = ImmichCatalogRequestBuilder.createTag(name)
+    override suspend fun createTagIfMissing(apiKey: String, serverBaseUrl: String, name: String): ImmichCatalogResult.Success {
+        val request = ImmichCatalogRequestBuilder.createTag(serverBaseUrl, name)
         val createExecution = execute(request, apiKey)
         val createResult = createExecution.result ?: return ImmichCatalogResult.Success(
             request = request,
@@ -76,7 +76,7 @@ class ApiImmichOnlineCatalogTransport(
             message = "Tag create failed before response: ${createExecution.errorMessage ?: "unknown network error"}"
         )
         return if (createResult.statusCode in 200..299 || createResult.statusCode == 409) {
-            val refreshed = lookupTags(apiKey)
+            val refreshed = lookupTags(apiKey = apiKey, serverBaseUrl = serverBaseUrl)
             refreshed.copy(message = "Tag ensure requested for \"$name\". ${refreshed.message}")
         } else {
             ImmichCatalogResult.Success(
@@ -89,10 +89,11 @@ class ApiImmichOnlineCatalogTransport(
 
     override suspend fun bulkUploadCheck(
         apiKey: String,
+        serverBaseUrl: String,
         items: List<ImmichBulkUploadCheckItem>
     ): ImmichBulkUploadCheckResult.Success {
         platformLogInfo("[immichuploader][dedup] request items=${items.size}")
-        val request = ImmichCatalogRequestBuilder.bulkUploadCheck(items)
+        val request = ImmichCatalogRequestBuilder.bulkUploadCheck(serverBaseUrl, items)
         val execution = execute(request, apiKey)
         val result = execution.result
         val existingAssets = if (result != null && result.statusCode in 200..299) {

@@ -3,32 +3,58 @@ package com.marcportabella.immichuploader.data
 class ApiKeyGatedImmichCatalogTransport(
     private val onlineTransport: ImmichOnlineCatalogTransport
 ) {
-    private val blockedMessage = "API key required for Immich catalog lookup/create."
+    private val blockedApiKeyMessage = "API key required for Immich catalog lookup/create."
+    private val blockedServerBaseUrlMessage = "Immich server URL required for catalog lookup/create."
 
-    fun gateStatus(apiKey: String?): TransportGateStatus =
-        if (apiKey.isNullOrBlank()) TransportGateStatus.MissingApiKey else TransportGateStatus.Ready
-
-    suspend fun lookupAlbums(apiKey: String?): ImmichCatalogResult {
-        val request = ImmichCatalogRequestBuilder.lookupAlbums()
-        if (gateStatus(apiKey) == TransportGateStatus.MissingApiKey) {
-            return ImmichCatalogResult.BlockedMissingApiKey(request, blockedMessage)
+    fun gateStatus(apiKey: String?, serverBaseUrl: String?): TransportGateStatus =
+        when {
+            apiKey.isNullOrBlank() -> TransportGateStatus.MissingApiKey
+            normalizeImmichApiBaseUrl(serverBaseUrl.orEmpty()).isBlank() -> TransportGateStatus.MissingServerBaseUrl
+            else -> TransportGateStatus.Ready
         }
-        return onlineTransport.lookupAlbums(apiKey.orEmpty())
+
+    suspend fun lookupAlbums(apiKey: String?, serverBaseUrl: String?): ImmichCatalogResult {
+        val normalizedServerBaseUrl = normalizeImmichApiBaseUrl(serverBaseUrl.orEmpty())
+        val request = ImmichCatalogRequestBuilder.lookupAlbums(normalizedServerBaseUrl)
+        return when (gateStatus(apiKey = apiKey, serverBaseUrl = normalizedServerBaseUrl)) {
+            TransportGateStatus.MissingApiKey ->
+                ImmichCatalogResult.BlockedMissingApiKey(request, blockedApiKeyMessage)
+
+            TransportGateStatus.MissingServerBaseUrl ->
+                ImmichCatalogResult.BlockedMissingServerBaseUrl(request, blockedServerBaseUrlMessage)
+
+            TransportGateStatus.Ready ->
+                onlineTransport.lookupAlbums(apiKey = apiKey.orEmpty(), serverBaseUrl = normalizedServerBaseUrl)
+        }
     }
 
-    suspend fun lookupTags(apiKey: String?): ImmichCatalogResult {
-        val request = ImmichCatalogRequestBuilder.lookupTags()
-        if (gateStatus(apiKey) == TransportGateStatus.MissingApiKey) {
-            return ImmichCatalogResult.BlockedMissingApiKey(request, blockedMessage)
+    suspend fun lookupTags(apiKey: String?, serverBaseUrl: String?): ImmichCatalogResult {
+        val normalizedServerBaseUrl = normalizeImmichApiBaseUrl(serverBaseUrl.orEmpty())
+        val request = ImmichCatalogRequestBuilder.lookupTags(normalizedServerBaseUrl)
+        return when (gateStatus(apiKey = apiKey, serverBaseUrl = normalizedServerBaseUrl)) {
+            TransportGateStatus.MissingApiKey ->
+                ImmichCatalogResult.BlockedMissingApiKey(request, blockedApiKeyMessage)
+
+            TransportGateStatus.MissingServerBaseUrl ->
+                ImmichCatalogResult.BlockedMissingServerBaseUrl(request, blockedServerBaseUrlMessage)
+
+            TransportGateStatus.Ready ->
+                onlineTransport.lookupTags(apiKey = apiKey.orEmpty(), serverBaseUrl = normalizedServerBaseUrl)
         }
-        return onlineTransport.lookupTags(apiKey.orEmpty())
     }
 
-    suspend fun createAlbumIfMissing(apiKey: String?, name: String): ImmichCatalogResult {
+    suspend fun createAlbumIfMissing(apiKey: String?, serverBaseUrl: String?, name: String): ImmichCatalogResult {
         val normalized = name.trim()
-        val request = ImmichCatalogRequestBuilder.createAlbum(normalized)
-        if (gateStatus(apiKey) == TransportGateStatus.MissingApiKey) {
-            return ImmichCatalogResult.BlockedMissingApiKey(request, blockedMessage)
+        val normalizedServerBaseUrl = normalizeImmichApiBaseUrl(serverBaseUrl.orEmpty())
+        val request = ImmichCatalogRequestBuilder.createAlbum(normalizedServerBaseUrl, normalized)
+        when (gateStatus(apiKey = apiKey, serverBaseUrl = normalizedServerBaseUrl)) {
+            TransportGateStatus.MissingApiKey ->
+                return ImmichCatalogResult.BlockedMissingApiKey(request, blockedApiKeyMessage)
+
+            TransportGateStatus.MissingServerBaseUrl ->
+                return ImmichCatalogResult.BlockedMissingServerBaseUrl(request, blockedServerBaseUrlMessage)
+
+            TransportGateStatus.Ready -> Unit
         }
         if (normalized.isEmpty()) {
             return ImmichCatalogResult.Success(
@@ -37,14 +63,25 @@ class ApiKeyGatedImmichCatalogTransport(
                 message = "Album name is empty."
             )
         }
-        return onlineTransport.createAlbumIfMissing(apiKey.orEmpty(), normalized)
+        return onlineTransport.createAlbumIfMissing(
+            apiKey = apiKey.orEmpty(),
+            serverBaseUrl = normalizedServerBaseUrl,
+            name = normalized
+        )
     }
 
-    suspend fun createTagIfMissing(apiKey: String?, name: String): ImmichCatalogResult {
+    suspend fun createTagIfMissing(apiKey: String?, serverBaseUrl: String?, name: String): ImmichCatalogResult {
         val normalized = name.trim()
-        val request = ImmichCatalogRequestBuilder.createTag(normalized)
-        if (gateStatus(apiKey) == TransportGateStatus.MissingApiKey) {
-            return ImmichCatalogResult.BlockedMissingApiKey(request, blockedMessage)
+        val normalizedServerBaseUrl = normalizeImmichApiBaseUrl(serverBaseUrl.orEmpty())
+        val request = ImmichCatalogRequestBuilder.createTag(normalizedServerBaseUrl, normalized)
+        when (gateStatus(apiKey = apiKey, serverBaseUrl = normalizedServerBaseUrl)) {
+            TransportGateStatus.MissingApiKey ->
+                return ImmichCatalogResult.BlockedMissingApiKey(request, blockedApiKeyMessage)
+
+            TransportGateStatus.MissingServerBaseUrl ->
+                return ImmichCatalogResult.BlockedMissingServerBaseUrl(request, blockedServerBaseUrlMessage)
+
+            TransportGateStatus.Ready -> Unit
         }
         if (normalized.isEmpty()) {
             return ImmichCatalogResult.Success(
@@ -53,17 +90,32 @@ class ApiKeyGatedImmichCatalogTransport(
                 message = "Tag name is empty."
             )
         }
-        return onlineTransport.createTagIfMissing(apiKey.orEmpty(), normalized)
+        return onlineTransport.createTagIfMissing(
+            apiKey = apiKey.orEmpty(),
+            serverBaseUrl = normalizedServerBaseUrl,
+            name = normalized
+        )
     }
 
-    suspend fun bulkUploadCheck(apiKey: String?, items: List<ImmichBulkUploadCheckItem>): ImmichBulkUploadCheckResult {
+    suspend fun bulkUploadCheck(
+        apiKey: String?,
+        serverBaseUrl: String?,
+        items: List<ImmichBulkUploadCheckItem>
+    ): ImmichBulkUploadCheckResult {
         val normalized = items
             .map { it.copy(id = it.id.trim(), checksum = it.checksum.trim()) }
             .filter { it.id.isNotEmpty() && it.checksum.isNotEmpty() }
             .distinctBy { it.id }
-        val request = ImmichCatalogRequestBuilder.bulkUploadCheck(normalized)
-        if (gateStatus(apiKey) == TransportGateStatus.MissingApiKey) {
-            return ImmichBulkUploadCheckResult.BlockedMissingApiKey(request, blockedMessage)
+        val normalizedServerBaseUrl = normalizeImmichApiBaseUrl(serverBaseUrl.orEmpty())
+        val request = ImmichCatalogRequestBuilder.bulkUploadCheck(normalizedServerBaseUrl, normalized)
+        when (gateStatus(apiKey = apiKey, serverBaseUrl = normalizedServerBaseUrl)) {
+            TransportGateStatus.MissingApiKey ->
+                return ImmichBulkUploadCheckResult.BlockedMissingApiKey(request, blockedApiKeyMessage)
+
+            TransportGateStatus.MissingServerBaseUrl ->
+                return ImmichBulkUploadCheckResult.BlockedMissingServerBaseUrl(request, blockedServerBaseUrlMessage)
+
+            TransportGateStatus.Ready -> Unit
         }
         if (normalized.isEmpty()) {
             return ImmichBulkUploadCheckResult.Success(
@@ -72,6 +124,10 @@ class ApiKeyGatedImmichCatalogTransport(
                 message = "No checksums available for duplicate check."
             )
         }
-        return onlineTransport.bulkUploadCheck(apiKey.orEmpty(), normalized)
+        return onlineTransport.bulkUploadCheck(
+            apiKey = apiKey.orEmpty(),
+            serverBaseUrl = normalizedServerBaseUrl,
+            items = normalized
+        )
     }
 }

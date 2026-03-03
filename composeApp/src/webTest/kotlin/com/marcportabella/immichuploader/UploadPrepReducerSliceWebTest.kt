@@ -1,6 +1,5 @@
 package com.marcportabella.immichuploader
 
-import com.marcportabella.immichuploader.data.IMMICH_API_BASE_URL
 import com.marcportabella.immichuploader.domain.AssetEditPatch
 import com.marcportabella.immichuploader.domain.BatchFeedback
 import com.marcportabella.immichuploader.domain.BatchFeedbackLevel
@@ -25,6 +24,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class UploadPrepReducerSliceWebTest {
+    private val testApiBaseUrl = "https://immich.test/api"
 
     @Test
     fun toggleSelectionIgnoresUnknownAssetAndPreservesFeedback() {
@@ -189,7 +189,10 @@ class UploadPrepReducerSliceWebTest {
 
         assertTrue(next.stagedEditsByAssetId.isEmpty())
         assertEquals(BatchFeedbackLevel.Error, next.batchFeedback?.level)
-        assertEquals("Select at least one asset before applying bulk edits.", next.batchFeedback?.message)
+        assertEquals(
+            "Pick a batch with at least one non-duplicate asset before applying bulk edits.",
+            next.batchFeedback?.message
+        )
         assertFalse(canApplyBulkEdit(next))
     }
 
@@ -251,7 +254,7 @@ class UploadPrepReducerSliceWebTest {
         )
 
         assertEquals(BatchFeedbackLevel.Warning, next.batchFeedback?.level)
-        assertEquals("No selected assets to clear.", next.batchFeedback?.message)
+        assertEquals("No editable assets in the batch to clear.", next.batchFeedback?.message)
         assertEquals(1, next.stagedEditsByAssetId.size)
     }
 
@@ -263,7 +266,7 @@ class UploadPrepReducerSliceWebTest {
         )
         assertEquals(BatchFeedbackLevel.Error, emptySelection.batchFeedback?.level)
         assertEquals(
-            "Select at least one asset before generating a dry-run plan.",
+            "Pick a batch with at least one non-duplicate asset before generating a request plan.",
             emptySelection.batchFeedback?.message
         )
 
@@ -272,6 +275,7 @@ class UploadPrepReducerSliceWebTest {
             UploadPrepState(
                 assets = mapOf(id to LocalAsset(id, "a.jpg", "image/jpeg", 1, null, null, null)),
                 selectedAssetIds = setOf(id),
+                serverBaseUrl = testApiBaseUrl,
                 stagedEditsByAssetId = mapOf(
                     id to AssetEditPatch(dateTimeOriginal = FieldPatch.Set("not-a-date"))
                 )
@@ -293,7 +297,8 @@ class UploadPrepReducerSliceWebTest {
         val next = reduceUploadPrepState(
             UploadPrepState(
                 assets = mapOf(id to LocalAsset(id, "a.jpg", "image/jpeg", 1, null, null, null)),
-                selectedAssetIds = setOf(id)
+                selectedAssetIds = setOf(id),
+                serverBaseUrl = testApiBaseUrl
             ),
             UploadPrepAction.GenerateDryRunPreview
         )
@@ -309,6 +314,7 @@ class UploadPrepReducerSliceWebTest {
         val next = reduceUploadPrepState(
             UploadPrepState(
                 selectedAssetIds = setOf(selectedOnly),
+                serverBaseUrl = testApiBaseUrl,
                 availableAlbums = listOf(UploadCatalogEntry("a1", "Family")),
                 availableTags = listOf(UploadCatalogEntry("t1", "Trip"))
             ),
@@ -319,7 +325,7 @@ class UploadPrepReducerSliceWebTest {
         assertTrue(next.dryRunApiRequests.isEmpty())
         assertEquals(BatchFeedbackLevel.Warning, next.batchFeedback?.level)
         assertEquals(
-            "No operations planned. Select assets and/or stage edits first.",
+            "No operations planned. Pick a batch and/or stage edits first.",
             next.batchFeedback?.message
         )
     }
@@ -335,6 +341,7 @@ class UploadPrepReducerSliceWebTest {
                     unselected to LocalAsset(unselected, "b.jpg", "image/jpeg", 1, null, null, null)
                 ),
                 selectedAssetIds = setOf(selected),
+                serverBaseUrl = testApiBaseUrl,
                 stagedEditsByAssetId = mapOf(
                     selected to AssetEditPatch(dateTimeOriginal = FieldPatch.Set("2026-01-01T00:00:00Z")),
                     unselected to AssetEditPatch(dateTimeOriginal = FieldPatch.Set("invalid"))
@@ -417,7 +424,7 @@ class UploadPrepReducerSliceWebTest {
             failed.copy(
                 dryRunPlan = DomainUploadRequestPlan(),
                 dryRunApiRequests = listOf(
-                    DomainUploadApiRequest("GET", "$IMMICH_API_BASE_URL/albums")
+                    DomainUploadApiRequest("GET", "$testApiBaseUrl/albums")
                 )
             ),
             UploadPrepAction.ClearDryRunPreview

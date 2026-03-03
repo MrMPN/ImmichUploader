@@ -3,6 +3,7 @@ package com.marcportabella.immichuploader.domain
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.marcportabella.immichuploader.data.normalizeImmichApiBaseUrl
 import kotlinx.datetime.TimeZone
 import kotlin.time.Instant
 
@@ -27,6 +28,7 @@ data class UploadPrepState(
     val stagedEditsByAssetId: Map<LocalAssetId, AssetEditPatch> = emptyMap(),
     val bulkEditDraft: BulkEditDraft = BulkEditDraft(),
     val apiKey: String = "",
+    val serverBaseUrl: String = "",
     val albumCreateDraft: String = "",
     val tagCreateDraft: String = "",
     val availableAlbums: List<UploadCatalogEntry> = emptyList(),
@@ -107,6 +109,7 @@ sealed interface UploadPrepAction {
     data object ApplyBulkEditDraftToSelected : UploadPrepAction
     data object ClearBulkEditDraft : UploadPrepAction
     data class SetApiKey(val value: String) : UploadPrepAction
+    data class SetServerBaseUrl(val value: String) : UploadPrepAction
     data class SetAlbumCreateDraft(val value: String) : UploadPrepAction
     data class SetTagCreateDraft(val value: String) : UploadPrepAction
     data class CreateSessionAlbumForBulk(val name: String) : UploadPrepAction
@@ -272,6 +275,21 @@ fun reduceUploadPrepState(state: UploadPrepState, action: UploadPrepAction): Upl
             executionRequestCount = null
         )
 
+        is UploadPrepAction.SetServerBaseUrl -> state.copy(
+            serverBaseUrl = action.value,
+            duplicateAssetIds = emptySet(),
+            duplicateCheckStatus = DuplicateCheckStatus.Idle,
+            duplicateCheckMessage = null,
+            catalogStatus = CatalogUiStatus.Idle,
+            catalogMessage = null,
+            dryRunPlan = null,
+            dryRunApiRequests = emptyList(),
+            dryRunMessage = null,
+            executionStatus = UploadExecutionStatus.Idle,
+            executionMessage = null,
+            executionRequestCount = null
+        )
+
         is UploadPrepAction.SetAlbumCreateDraft -> state.copy(albumCreateDraft = action.value)
 
         is UploadPrepAction.SetTagCreateDraft -> state.copy(tagCreateDraft = action.value)
@@ -421,7 +439,10 @@ fun reduceUploadPrepState(state: UploadPrepState, action: UploadPrepAction): Upl
                 )
             } else {
                 val plan = UploadRequestPlanner.buildDryRunPlan(state)
-                val requests = UploadRequestPlanner.buildPayloadInspectorRequests(plan)
+                val requests = UploadRequestPlanner.buildPayloadInspectorRequests(
+                    plan = plan,
+                    apiBaseUrl = state.serverBaseUrl
+                )
                 val feedback = if (requests.isEmpty()) {
                     BatchFeedback(
                         level = BatchFeedbackLevel.Warning,
@@ -624,6 +645,13 @@ private fun preflightDryRun(state: UploadPrepState): BatchFeedback? {
         return BatchFeedback(
             level = BatchFeedbackLevel.Error,
             message = "Pick a batch with at least one non-duplicate asset before generating a request plan."
+        )
+    }
+
+    if (normalizeImmichApiBaseUrl(state.serverBaseUrl).isBlank()) {
+        return BatchFeedback(
+            level = BatchFeedbackLevel.Error,
+            message = "Immich server URL is required before generating a request plan."
         )
     }
 

@@ -86,9 +86,15 @@ fun App() {
         val initialApiKey = remember {
             loadPersistedApiKey().orEmpty()
         }
+        val initialServerBaseUrl = remember {
+            loadPersistedServerBaseUrl().orEmpty()
+        }
         val store = remember {
             UploadPrepStore(
-                UploadPrepState(apiKey = initialApiKey)
+                UploadPrepState(
+                    apiKey = initialApiKey,
+                    serverBaseUrl = initialServerBaseUrl
+                )
             )
         }
         var uiLanguage by rememberSaveable { mutableStateOf(UiLanguage.Catalan) }
@@ -97,7 +103,8 @@ fun App() {
                 store = store,
                 uiLanguage = uiLanguage,
                 onUiLanguageChange = { uiLanguage = it },
-                onPersistApiKey = { persistApiKey(it) }
+                onPersistApiKey = { persistApiKey(it) },
+                onPersistServerBaseUrl = { persistServerBaseUrl(it) }
             )
         }
     }

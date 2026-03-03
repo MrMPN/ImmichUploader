@@ -13,6 +13,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class TransportGatesSliceWebTest {
+    private val testApiBaseUrl = "https://immich.test/api"
 
     @Test
     fun catalogTransportGateStatusFollowsApiKeyPresence() {
@@ -20,50 +21,60 @@ class TransportGatesSliceWebTest {
             private val albums = linkedMapOf<String, ImmichCatalogEntry>()
             private val tags = linkedMapOf<String, ImmichCatalogEntry>()
 
-            override suspend fun lookupAlbums(apiKey: String): ImmichCatalogResult.Success =
+            override suspend fun lookupAlbums(apiKey: String, serverBaseUrl: String): ImmichCatalogResult.Success =
                 ImmichCatalogResult.Success(
-                    request = ImmichCatalogRequestBuilder.lookupAlbums(),
+                    request = ImmichCatalogRequestBuilder.lookupAlbums(serverBaseUrl),
                     entries = albums.values.toList(),
                     message = "ok"
                 )
 
-            override suspend fun lookupTags(apiKey: String): ImmichCatalogResult.Success =
+            override suspend fun lookupTags(apiKey: String, serverBaseUrl: String): ImmichCatalogResult.Success =
                 ImmichCatalogResult.Success(
-                    request = ImmichCatalogRequestBuilder.lookupTags(),
+                    request = ImmichCatalogRequestBuilder.lookupTags(serverBaseUrl),
                     entries = tags.values.toList(),
                     message = "ok"
                 )
 
-            override suspend fun createAlbumIfMissing(apiKey: String, name: String): ImmichCatalogResult.Success {
+            override suspend fun createAlbumIfMissing(
+                apiKey: String,
+                serverBaseUrl: String,
+                name: String
+            ): ImmichCatalogResult.Success {
                 val key = name.lowercase()
                 if (albums[key] == null) {
                     albums[key] = ImmichCatalogEntry(key, name)
                 }
-                return lookupAlbums(apiKey)
+                return lookupAlbums(apiKey, serverBaseUrl)
             }
 
-            override suspend fun createTagIfMissing(apiKey: String, name: String): ImmichCatalogResult.Success {
+            override suspend fun createTagIfMissing(
+                apiKey: String,
+                serverBaseUrl: String,
+                name: String
+            ): ImmichCatalogResult.Success {
                 val key = name.lowercase()
                 if (tags[key] == null) {
                     tags[key] = ImmichCatalogEntry(key, name)
                 }
-                return lookupTags(apiKey)
+                return lookupTags(apiKey, serverBaseUrl)
             }
 
             override suspend fun bulkUploadCheck(
                 apiKey: String,
+                serverBaseUrl: String,
                 items: List<com.marcportabella.immichuploader.data.ImmichBulkUploadCheckItem>
             ) = com.marcportabella.immichuploader.data.ImmichBulkUploadCheckResult.Success(
-                request = ImmichCatalogRequestBuilder.bulkUploadCheck(items),
+                request = ImmichCatalogRequestBuilder.bulkUploadCheck(serverBaseUrl, items),
                 existingAssetIdByItemId = emptyMap(),
                 message = "ok"
             )
         }
         val transport = ApiKeyGatedImmichCatalogTransport(fakeTransport)
 
-        assertEquals(TransportGateStatus.MissingApiKey, transport.gateStatus(null))
-        assertEquals(TransportGateStatus.MissingApiKey, transport.gateStatus("   "))
-        assertEquals(TransportGateStatus.Ready, transport.gateStatus("k"))
+        assertEquals(TransportGateStatus.MissingApiKey, transport.gateStatus(null, testApiBaseUrl))
+        assertEquals(TransportGateStatus.MissingApiKey, transport.gateStatus("   ", testApiBaseUrl))
+        assertEquals(TransportGateStatus.MissingServerBaseUrl, transport.gateStatus("k", ""))
+        assertEquals(TransportGateStatus.Ready, transport.gateStatus("k", testApiBaseUrl))
     }
 
     @Test
@@ -72,17 +83,22 @@ class TransportGatesSliceWebTest {
 
         assertEquals(
             UploadExecutionPath.BlockedMissingApiKey,
-            transport.selectExecutionPath(apiKey = null)
+            transport.selectExecutionPath(apiKey = null, serverBaseUrl = testApiBaseUrl)
         )
         assertEquals(
             UploadExecutionPath.BlockedMissingApiKey,
-            transport.selectExecutionPath(apiKey = "   ")
+            transport.selectExecutionPath(apiKey = "   ", serverBaseUrl = testApiBaseUrl)
+        )
+        assertEquals(
+            UploadExecutionPath.BlockedMissingServerBaseUrl,
+            transport.selectExecutionPath(apiKey = "key", serverBaseUrl = "")
         )
         assertEquals(
             UploadExecutionPath.ApiExecution,
-            transport.selectExecutionPath(apiKey = "key")
+            transport.selectExecutionPath(apiKey = "key", serverBaseUrl = testApiBaseUrl)
         )
-        assertEquals(TransportGateStatus.MissingApiKey, transport.gateStatus(null))
-        assertEquals(TransportGateStatus.Ready, transport.gateStatus("key"))
+        assertEquals(TransportGateStatus.MissingApiKey, transport.gateStatus(null, testApiBaseUrl))
+        assertEquals(TransportGateStatus.MissingServerBaseUrl, transport.gateStatus("key", ""))
+        assertEquals(TransportGateStatus.Ready, transport.gateStatus("key", testApiBaseUrl))
     }
 }

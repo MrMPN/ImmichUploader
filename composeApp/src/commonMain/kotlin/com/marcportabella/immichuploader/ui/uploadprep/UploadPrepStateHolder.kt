@@ -14,6 +14,7 @@ import com.marcportabella.immichuploader.data.ImmichRequestBuilder
 import com.marcportabella.immichuploader.data.ImmichTransportResult
 import com.marcportabella.immichuploader.data.defaultImmichApiExecutor
 import com.marcportabella.immichuploader.data.immichJson
+import com.marcportabella.immichuploader.data.normalizeImmichApiBaseUrl
 import com.marcportabella.immichuploader.data.toDomainCatalogEntry
 import com.marcportabella.immichuploader.domain.BulkEditDraft
 import com.marcportabella.immichuploader.domain.LocalAssetId
@@ -48,13 +49,13 @@ class UploadPrepStateHolder(
         get() = store.state
 
     val gateStatus: String
-        get() = transport.gateStatus(apiKey = apiKeyOrNull).toString()
+        get() = transport.gateStatus(apiKey = apiKeyOrNull, serverBaseUrl = serverBaseUrlOrNull).toString()
 
     val executionPath: String
-        get() = transport.selectExecutionPath(apiKey = apiKeyOrNull).toString()
+        get() = transport.selectExecutionPath(apiKey = apiKeyOrNull, serverBaseUrl = serverBaseUrlOrNull).toString()
 
     val catalogGateStatus: String
-        get() = catalogTransport.gateStatus(apiKeyOrNull).toString()
+        get() = catalogTransport.gateStatus(apiKey = apiKeyOrNull, serverBaseUrl = serverBaseUrlOrNull).toString()
 
     val bulkPreflightMessage: String?
         get() = preflightBulkEditDraft(state)?.message
@@ -66,9 +67,11 @@ class UploadPrepStateHolder(
 
     suspend fun loadCatalogAtInit() {
         dispatch(UploadPrepAction.CatalogRequestStarted)
-        val apiKey = apiKeyOrNull
-        when (val albumResult = catalogTransport.lookupAlbums(apiKey)) {
+        when (val albumResult = catalogTransport.lookupAlbums(apiKey = apiKeyOrNull, serverBaseUrl = serverBaseUrlOrNull)) {
             is ImmichCatalogResult.BlockedMissingApiKey ->
+                dispatch(UploadPrepAction.CatalogBlockedMissingApiKey(albumResult.message))
+
+            is ImmichCatalogResult.BlockedMissingServerBaseUrl ->
                 dispatch(UploadPrepAction.CatalogBlockedMissingApiKey(albumResult.message))
 
             is ImmichCatalogResult.Success ->
@@ -79,8 +82,11 @@ class UploadPrepStateHolder(
                     )
                 )
         }
-        when (val tagResult = catalogTransport.lookupTags(apiKey)) {
+        when (val tagResult = catalogTransport.lookupTags(apiKey = apiKeyOrNull, serverBaseUrl = serverBaseUrlOrNull)) {
             is ImmichCatalogResult.BlockedMissingApiKey ->
+                dispatch(UploadPrepAction.CatalogBlockedMissingApiKey(tagResult.message))
+
+            is ImmichCatalogResult.BlockedMissingServerBaseUrl ->
                 dispatch(UploadPrepAction.CatalogBlockedMissingApiKey(tagResult.message))
 
             is ImmichCatalogResult.Success ->
@@ -97,9 +103,15 @@ class UploadPrepStateHolder(
         dispatch(UploadPrepAction.SetApiKey(value.trim()))
     }
 
+    fun setServerBaseUrl(value: String) {
+        dispatch(UploadPrepAction.SetServerBaseUrl(value.trim()))
+    }
+
     suspend fun lookupApiKeyOwner(): ApiKeyOwnerLookupResult {
         val apiKey = apiKeyOrNull ?: return ApiKeyOwnerLookupResult.MissingApiKey
-        val request = ImmichCatalogRequestBuilder.lookupCurrentUser()
+        val serverBaseUrl = serverBaseUrlOrNull
+            ?: return ApiKeyOwnerLookupResult.Failed("Immich server URL is required.")
+        val request = ImmichCatalogRequestBuilder.lookupCurrentUser(serverBaseUrl)
         return runCatching { apiExecutor.execute(request = request, apiKey = apiKey) }
             .fold(
                 onSuccess = { response ->
@@ -130,9 +142,18 @@ class UploadPrepStateHolder(
         val executionPlan = ImmichRequestBuilder.buildDryRunPlan(snapshot)
 
         dispatch(UploadPrepAction.UploadExecutionStarted("Executing ${snapshot.dryRunApiRequests.size} API requests."))
-        when (val result = transport.submit(plan = executionPlan, apiKey = snapshot.apiKey.ifBlank { null })) {
+        when (
+            val result = transport.submit(
+                plan = executionPlan,
+                apiKey = snapshot.apiKey.ifBlank { null },
+                serverBaseUrl = snapshot.serverBaseUrl.ifBlank { null }
+            )
+        ) {
             is ImmichTransportResult.BlockedMissingApiKey ->
                 dispatch(UploadPrepAction.UploadExecutionBlocked("API key required. Upload execution remained blocked."))
+
+            is ImmichTransportResult.BlockedMissingServerBaseUrl ->
+                dispatch(UploadPrepAction.UploadExecutionBlocked("Immich server URL required. Upload execution remained blocked."))
 
             is ImmichTransportResult.Submitted ->
                 dispatch(
@@ -215,9 +236,20 @@ class UploadPrepStateHolder(
         }
 
         dispatch(UploadPrepAction.DuplicateCheckStarted)
-        when (val result = catalogTransport.bulkUploadCheck(apiKey = apiKeyOrNull, items = items)) {
+        when (
+            val result = catalogTransport.bulkUploadCheck(
+                apiKey = apiKeyOrNull,
+                serverBaseUrl = serverBaseUrlOrNull,
+                items = items
+            )
+        ) {
             is ImmichBulkUploadCheckResult.BlockedMissingApiKey -> {
                 platformLogInfo("[immichuploader][dedup] blocked reason=missing-api-key")
+                dispatch(UploadPrepAction.DuplicateCheckBlockedMissingApiKey(result.message))
+            }
+
+            is ImmichBulkUploadCheckResult.BlockedMissingServerBaseUrl -> {
+                platformLogInfo("[immichuploader][dedup] blocked reason=missing-server-url")
                 dispatch(UploadPrepAction.DuplicateCheckBlockedMissingApiKey(result.message))
             }
 
@@ -245,6 +277,9 @@ class UploadPrepStateHolder(
 
     private val apiKeyOrNull: String?
         get() = state.apiKey.ifBlank { null }
+
+    private val serverBaseUrlOrNull: String?
+        get() = normalizeImmichApiBaseUrl(state.serverBaseUrl).ifBlank { null }
 
     private fun parseUserDisplayName(responseBody: String): String? {
         val root = runCatching { immichJson.parseToJsonElement(responseBody).jsonObject }.getOrNull() ?: return null

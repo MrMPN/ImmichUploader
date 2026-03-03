@@ -6,8 +6,8 @@ import kotlinx.serialization.json.Json
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant
+import com.marcportabella.immichuploader.data.buildImmichApiUrl
 
-private const val IMMICH_API_BASE_URL: String = "https://fotos.marcportabella.com/api"
 private const val FALLBACK_TIMESTAMP = "1970-01-01T00:00:00Z"
 private const val DEFAULT_DEVICE_ID = "web-local-device"
 
@@ -126,28 +126,28 @@ object UploadRequestPlanner {
         )
     }
 
-    fun buildPayloadInspectorRequests(plan: UploadRequestPlan): List<UploadApiRequest> {
+    fun buildPayloadInspectorRequests(plan: UploadRequestPlan, apiBaseUrl: String): List<UploadApiRequest> {
         val requests = mutableListOf<UploadApiRequest>()
 
         plan.lookupHooks.forEach { hook ->
             requests += when (hook) {
                 UploadLookupHook.LookupAlbums ->
-                    UploadApiRequest(method = "GET", url = "$IMMICH_API_BASE_URL/albums")
+                    UploadApiRequest(method = "GET", url = buildImmichApiUrl(apiBaseUrl, "albums"))
 
                 UploadLookupHook.LookupTags ->
-                    UploadApiRequest(method = "GET", url = "$IMMICH_API_BASE_URL/tags")
+                    UploadApiRequest(method = "GET", url = buildImmichApiUrl(apiBaseUrl, "tags"))
 
                 is UploadLookupHook.CreateAlbumIfMissing ->
                     UploadApiRequest(
                         method = "POST",
-                        url = "$IMMICH_API_BASE_URL/albums",
+                        url = buildImmichApiUrl(apiBaseUrl, "albums"),
                         body = uploadRequestJson.encodeToString(UploadNameRequest(hook.name.trim()))
                     )
 
                 is UploadLookupHook.CreateTagIfMissing ->
                     UploadApiRequest(
                         method = "POST",
-                        url = "$IMMICH_API_BASE_URL/tags",
+                        url = buildImmichApiUrl(apiBaseUrl, "tags"),
                         body = uploadRequestJson.encodeToString(UploadNameRequest(hook.name.trim()))
                     )
             }
@@ -156,7 +156,7 @@ object UploadRequestPlanner {
         plan.uploadRequests.forEach { request ->
             requests += UploadApiRequest(
                 method = "POST",
-                url = "$IMMICH_API_BASE_URL/assets",
+                url = buildImmichApiUrl(apiBaseUrl, "assets"),
                 body = request.toPayloadJson()
             )
         }
@@ -164,7 +164,7 @@ object UploadRequestPlanner {
         plan.bulkMetadataRequests.forEach { request ->
             requests += UploadApiRequest(
                 method = "PUT",
-                url = "$IMMICH_API_BASE_URL/assets/updateAssets",
+                url = buildImmichApiUrl(apiBaseUrl, "assets/updateAssets"),
                 body = request.toPayloadJson()
             )
         }
@@ -173,7 +173,7 @@ object UploadRequestPlanner {
             request.tagIds.sorted().forEach { tagId ->
                 requests += UploadApiRequest(
                     method = "PUT",
-                    url = "$IMMICH_API_BASE_URL/tags/$tagId/assets",
+                    url = buildImmichApiUrl(apiBaseUrl, "tags/$tagId/assets"),
                     body = uploadRequestJson.encodeToString(UploadTagAssetsPayload(request.assetIds.sorted()))
                 )
             }
@@ -182,7 +182,7 @@ object UploadRequestPlanner {
         plan.albumAddRequests.forEach { request ->
             requests += UploadApiRequest(
                 method = "PUT",
-                url = "$IMMICH_API_BASE_URL/albums/assets",
+                url = buildImmichApiUrl(apiBaseUrl, "albums/assets"),
                 body = request.toPayloadJson()
             )
         }

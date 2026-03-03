@@ -58,8 +58,8 @@ internal fun previewBulkDraft(): BulkEditDraft = BulkEditDraft(
 )
 
 internal fun previewRequests(): List<UploadApiRequest> = listOf(
-    UploadApiRequest(method = "GET", url = "https://fotos.marcportabella.com/api/albums"),
-    UploadApiRequest(method = "PATCH", url = "https://fotos.marcportabella.com/api/assets", body = """{"ids":["a1"]}""")
+    UploadApiRequest(method = "GET", url = "https://immich.example/api/albums"),
+    UploadApiRequest(method = "PATCH", url = "https://immich.example/api/assets", body = """{"ids":["a1"]}""")
 )
 
 internal fun previewPlan(): UploadRequestPlan = UploadRequestPlan()
