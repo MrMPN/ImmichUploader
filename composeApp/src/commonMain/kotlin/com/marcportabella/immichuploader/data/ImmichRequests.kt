@@ -27,12 +27,14 @@ internal val immichJson: Json = Json {
 fun normalizeImmichApiBaseUrl(rawValue: String): String {
     val trimmed = rawValue.trim().trimEnd('/')
     if (trimmed.isEmpty()) return ""
-    val withScheme = if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+    val baseUrl = if (trimmed.startsWith("/")) {
+        trimmed
+    } else if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
         trimmed
     } else {
         "https://$trimmed"
     }
-    return if (withScheme.endsWith("/api")) withScheme else "$withScheme/api"
+    return if (baseUrl.endsWith("/api")) baseUrl else "$baseUrl/api"
 }
 
 fun buildImmichApiUrl(apiBaseUrl: String, endpointPath: String): String {

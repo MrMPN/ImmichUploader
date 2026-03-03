@@ -26,6 +26,12 @@ services:
       - "8088:8080"
 ```
 
+URL input behavior:
+
+- You can enter a full Immich URL such as `https://fotos.example.com` or `http://192.168.1.50:2283`.
+- The web app relays API traffic through same-origin `/__immich_proxy/...`, so browser CORS setup is not required.
+- Relative paths like `/api` are still accepted when you already have your own reverse-proxy route.
+
 If the package is private, run once on Unraid:
 
 ```bash

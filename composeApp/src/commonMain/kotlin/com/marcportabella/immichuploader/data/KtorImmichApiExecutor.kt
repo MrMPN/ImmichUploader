@@ -17,8 +17,12 @@ class KtorImmichApiExecutor(
     private val client: HttpClient
 ) : ImmichApiExecutor {
     override suspend fun execute(request: ImmichApiRequest, apiKey: String): ImmichApiExecutorResult {
-        platformLogInfo("[immichuploader][http] -> ${request.method} ${request.url}")
-        val response = client.request(request.url) {
+        val requestUrl = platformRewriteRequestUrl(request.url)
+        if (requestUrl != request.url) {
+            platformLogInfo("[immichuploader][http] proxy-rewrite ${request.url} -> $requestUrl")
+        }
+        platformLogInfo("[immichuploader][http] -> ${request.method} $requestUrl")
+        val response = client.request(requestUrl) {
             method = HttpMethod.parse(request.method)
             header(HttpHeaders.Accept, "application/json")
             header("x-api-key", apiKey)
@@ -110,12 +114,12 @@ class KtorImmichApiExecutor(
 
         val responseBody = response.body<String>()
         platformLogInfo(
-            "[immichuploader][http] <- ${request.method} ${request.url} status=${response.status.value} bodyBytes=${responseBody.length}"
+            "[immichuploader][http] <- ${request.method} $requestUrl status=${response.status.value} bodyBytes=${responseBody.length}"
         )
         if (response.status.value !in 200..299) {
             val snippet = responseBody.replace('\n', ' ').take(500)
             platformLogInfo(
-                "[immichuploader][http] !! ${request.method} ${request.url} errorBody=$snippet"
+                "[immichuploader][http] !! ${request.method} $requestUrl errorBody=$snippet"
             )
         }
 
