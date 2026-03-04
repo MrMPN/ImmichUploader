@@ -31,6 +31,7 @@ URL input behavior:
 - You can enter a full Immich URL such as `https://fotos.example.com` or `http://192.168.1.50:2283`.
 - The web app relays API traffic through same-origin `/__immich_proxy/...`, so browser CORS setup is not required.
 - Relative paths like `/api` are still accepted when you already have your own reverse-proxy route.
+- When running the web app on local dev origins (`localhost`/`127.0.0.1`), relay rewrite is skipped and requests go directly to the entered URL.
 
 If the package is private, run once on Unraid:
 

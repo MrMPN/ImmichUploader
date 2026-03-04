@@ -9,6 +9,9 @@ internal actual fun platformRewriteRequestUrl(rawUrl: String): String = jsRewrit
     const input = (url ?? '').toString();
     const current = globalThis.location;
     if (!current || !current.origin) return input;
+    const host = (current.hostname ?? '').toLowerCase();
+    const isLocalDevOrigin = host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '[::1]';
+    if (isLocalDevOrigin) return input;
 
     const hasScheme = /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(input);
     if (!hasScheme) return input;
