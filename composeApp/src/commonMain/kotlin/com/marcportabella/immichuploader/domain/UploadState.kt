@@ -28,7 +28,7 @@ data class UploadPrepState(
     val stagedEditsByAssetId: Map<LocalAssetId, AssetEditPatch> = emptyMap(),
     val bulkEditDraft: BulkEditDraft = BulkEditDraft(),
     val apiKey: String = "",
-    val serverBaseUrl: String = "",
+    val serverBaseUrl: String = "/api",
     val albumCreateDraft: String = "",
     val tagCreateDraft: String = "",
     val availableAlbums: List<UploadCatalogEntry> = emptyList(),

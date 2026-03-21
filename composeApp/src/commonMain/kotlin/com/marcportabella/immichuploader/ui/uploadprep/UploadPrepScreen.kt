@@ -22,7 +22,6 @@ fun UploadPrepScreen(
     uiLanguage: UiLanguage = UiLanguage.Catalan,
     onUiLanguageChange: (UiLanguage) -> Unit = {},
     onPersistApiKey: (String) -> Unit = {},
-    onPersistServerBaseUrl: (String) -> Unit = {},
     enableWebEffects: Boolean = true
 ) {
     val stateHolder = rememberUploadPrepStateHolder(store)
@@ -99,10 +98,6 @@ fun UploadPrepScreen(
             stateHolder.setApiKey(nextValue)
             onPersistApiKey(nextValue)
         },
-        onServerBaseUrlChange = { nextValue ->
-            stateHolder.setServerBaseUrl(nextValue)
-            onPersistServerBaseUrl(nextValue)
-        },
         keyOwnerName = keyOwnerName,
         keyOwnerLookupInProgress = keyOwnerLookupInProgress,
         keyOwnerLookupFailed = keyOwnerLookupFailed,
@@ -140,7 +135,6 @@ private fun UploadPrepScreenRoutePreview(
             uiLanguage = UiLanguage.Catalan,
             onUiLanguageChange = {},
             onPersistApiKey = {},
-            onPersistServerBaseUrl = {},
             enableWebEffects = false
         )
     }

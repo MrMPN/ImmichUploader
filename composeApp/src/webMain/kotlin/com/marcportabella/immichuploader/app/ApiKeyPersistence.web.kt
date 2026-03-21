@@ -1,11 +1,7 @@
 package com.marcportabella.immichuploader.app
 
-import com.marcportabella.immichuploader.data.normalizeImmichApiBaseUrl
-
 private const val API_KEY_STORAGE_KEY = "immichuploader.api_key"
 private const val API_KEY_COOKIE_NAME = "immichuploader_api_key"
-private const val SERVER_BASE_URL_STORAGE_KEY = "immichuploader.server_base_url"
-private const val SERVER_BASE_URL_COOKIE_NAME = "immichuploader_server_base_url"
 private const val API_KEY_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365
 
 internal fun loadPersistedApiKey(): String? {
@@ -26,26 +22,6 @@ internal fun persistApiKey(apiKey: String) {
     }
     jsLocalStorageSet(API_KEY_STORAGE_KEY, normalized)
     jsSetCookie(API_KEY_COOKIE_NAME, normalized, API_KEY_COOKIE_MAX_AGE_SECONDS)
-}
-
-internal fun loadPersistedServerBaseUrl(): String? {
-    val fromStorage = jsLocalStorageGet(SERVER_BASE_URL_STORAGE_KEY)?.trim().orEmpty()
-    if (fromStorage.isNotEmpty()) {
-        return normalizeImmichApiBaseUrl(fromStorage).ifEmpty { null }
-    }
-    val fromCookie = parseCookieValue(jsReadCookies(), SERVER_BASE_URL_COOKIE_NAME)?.trim().orEmpty()
-    return normalizeImmichApiBaseUrl(fromCookie).ifEmpty { null }
-}
-
-internal fun persistServerBaseUrl(serverBaseUrl: String) {
-    val normalized = normalizeImmichApiBaseUrl(serverBaseUrl)
-    if (normalized.isEmpty()) {
-        jsLocalStorageRemove(SERVER_BASE_URL_STORAGE_KEY)
-        jsClearCookie(SERVER_BASE_URL_COOKIE_NAME)
-        return
-    }
-    jsLocalStorageSet(SERVER_BASE_URL_STORAGE_KEY, normalized)
-    jsSetCookie(SERVER_BASE_URL_COOKIE_NAME, normalized, API_KEY_COOKIE_MAX_AGE_SECONDS)
 }
 
 private fun parseCookieValue(cookieHeader: String, key: String): String? =

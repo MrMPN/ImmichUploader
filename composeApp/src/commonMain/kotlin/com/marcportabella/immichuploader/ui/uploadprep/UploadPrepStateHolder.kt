@@ -103,10 +103,6 @@ class UploadPrepStateHolder(
         dispatch(UploadPrepAction.SetApiKey(value.trim()))
     }
 
-    fun setServerBaseUrl(value: String) {
-        dispatch(UploadPrepAction.SetServerBaseUrl(value.trim()))
-    }
-
     suspend fun lookupApiKeyOwner(): ApiKeyOwnerLookupResult {
         val apiKey = apiKeyOrNull ?: return ApiKeyOwnerLookupResult.MissingApiKey
         val serverBaseUrl = serverBaseUrlOrNull
