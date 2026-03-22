@@ -66,6 +66,8 @@ import immichuploader.composeapp.generated.resources.summary_toggle_hide_system_
 import immichuploader.composeapp.generated.resources.summary_toggle_show_system_status
 import immichuploader.composeapp.generated.resources.summary_toggle_show_system_status_ca
 
+private const val APP_VERSION = "1.0a"
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SummaryHeaderCard(
@@ -104,6 +106,10 @@ fun SummaryHeaderCard(
                         ),
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = "Version $APP_VERSION",
+                        style = MaterialTheme.typography.bodySmall
                     )
                     Text(
                         text = i18nString(
